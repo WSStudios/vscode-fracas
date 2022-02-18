@@ -1,8 +1,8 @@
 import * as fs from "fs";
-import { parse } from "path";
+import * as path from "path";
 import * as vscode from "vscode";
 import { getOrDefault } from "./containers";
-import { getFilePath, getSelectedSymbol, withFilePath } from "./editor-lib";
+import { getSelectedSymbol, withFilePath } from "./editor-lib";
 import {
     createTerminal,
     runFileInTerminal,
@@ -12,7 +12,13 @@ import {
     withRepl,
 } from "./repl";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { execShell, fileName, getRacket, normalizeFilePath, openRacketReference, withRacket } from "./utils";
+import { 
+    execShell, 
+    getRacket, 
+    openRacketReference, 
+    kebabCaseToPascalCase, 
+    withRacket 
+} from "./utils";
 
 export function helpWithSelectedSymbol(): void {
     const fracasObject = getSelectedSymbol();
@@ -42,16 +48,52 @@ export function runInTerminal(terminals: Map<string, vscode.Terminal>): void {
 export function loadInRepl(repls: Map<string, vscode.Terminal>): void {
     withFilePath((filePath: string) => {
         withRacket((racket: string, racketArgs: string[]) => {
-            const repl = getOrDefault(repls, filePath, () => createRepl(fileName(filePath), racket, racketArgs));
+            const repl = getOrDefault(repls, filePath, () => createRepl(path.basename(filePath), racket, racketArgs));
             loadFileInRepl(filePath, repl);
         });
     });
 }
 
 export async function executeSelection(repls: Map<string, vscode.Terminal>): Promise<void> {
-    const filePath = getFilePath();
+    const filePath = vscode.window.activeTextEditor?.document?.fileName;
     if (filePath) {
         await withRepl(repls, filePath, executeSelectionInRepl);
+    }
+}
+
+export async function makeStringTableImport(document?: vscode.TextDocument): Promise<void> {
+    const [racket, racketArgs] = getRacket();
+    // const stringTableCpp = vscode.workspace
+    //     .getConfiguration("vscode-fracas.general")
+    //     .get<string>("stringTableRegistryFile") 
+    //     || "..\\tdp1.unreal\\Source\\Data\\Private\\Generated\\TdpLocalization.cpp";
+    const projectDir = vscode.workspace
+        .getConfiguration("vscode-fracas.general")
+        .get<string>("projectDir") || ".";
+    const stringTableDestDir = vscode.workspace
+        .getConfiguration("vscode-fracas.localization")
+        .get<string>("stringTableDestDir") || ".";
+    const stringTableSourcePaths = vscode.workspace
+        .getConfiguration("vscode-fracas.localization")
+        .get<string[]>("stringTableSourcePaths") || [];
+
+    document = document || vscode.window.activeTextEditor?.document;
+
+    if (racket && document) 
+    {
+        const textFrcFiles = [];
+        for (const pathPattern of stringTableSourcePaths) {
+            const glob = new vscode.RelativePattern(vscode.Uri.file(projectDir), pathPattern);
+            textFrcFiles.push(...await vscode.workspace.findFiles(glob));
+        }
+        textFrcFiles.sort();
+        const csvFiles = textFrcFiles.map(frcFile => {
+            const csvBaseName = kebabCaseToPascalCase(path.basename(frcFile.fsPath, ".frc"));
+            const csvFile = path.resolve(`${projectDir}\\${stringTableDestDir}\\${csvBaseName}.csv`);
+            return csvFile;
+        });
+
+        execShell(`${racket} ${racketArgs.join(" ")} ../fracas/lib/fracas/make-string-table-import.rkt -- ${csvFiles.join(" ")}`);
     }
 }
 
@@ -67,7 +109,7 @@ export function compileFracasObject(filePath: string, fracasObject: string): voi
 let lastFracasObject = "";
 let lastFracasFile = "";
 export function compileSelectedFracasObject(): void {
-    lastFracasFile = getFilePath() || "";
+    lastFracasFile = vscode.window.activeTextEditor?.document?.fileName || "";
     lastFracasObject = getSelectedSymbol();
     compileFracasObject(lastFracasFile, lastFracasObject);
 }
@@ -91,7 +133,7 @@ export function precompileFracasFile(frcDoc: vscode.TextDocument | undefined = u
             .get<string>("ninjaPath") || "ninja";
         
         // determine the .zo file from the fracas file
-        const frcPath = parse(normalizeFilePath(frcDoc.fileName));
+        const frcPath = path.parse(path.resolve(frcDoc.fileName));
         const upperRoot = frcPath.root.toUpperCase(); // ninja requires that the drive letter be uppercase
         const zoFile = `${upperRoot}${frcPath.dir.substring(upperRoot.length)}/compiled/${frcPath.name}_frc.zo`;
 
@@ -111,7 +153,7 @@ export function precompileFracasFile(frcDoc: vscode.TextDocument | undefined = u
 export function openRepl(repls: Map<string, vscode.Terminal>): void {
     withFilePath((filePath: string) => {
         withRacket((racket: string, racketArgs: string[]) => {
-            const repl = getOrDefault(repls, filePath, () => createRepl(fileName(filePath), racket, racketArgs));
+            const repl = getOrDefault(repls, filePath, () => createRepl(path.basename(filePath), racket, racketArgs));
             repl.show();
         });
     });

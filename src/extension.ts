@@ -106,6 +106,7 @@ export function activate(context: vscode.ExtensionContext): void {
         reg("compileSelectedFracasObject", () => com.compileSelectedFracasObject()),
         reg("recompileFracasObject", () => com.recompileFracasObject()),
         reg("precompileFracasFile", () => com.precompileFracasFile()),
+        reg("makeStringTableImport", () => com.makeStringTableImport()),
         reg("loadFileInRepl", () => com.loadInRepl(repls)),
         reg("runFile", () => com.runInTerminal(terminals)),
         reg("executeSelectionInRepl", () => com.executeSelection(repls)),

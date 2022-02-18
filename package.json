@@ -21,10 +21,14 @@
     ],
     "activationEvents": [
         "onLanguage:fracas",
-        "onCommand:vscode-fracas.loadFileInRepl",
-        "onCommand:vscode-fracas.runFile",
+        "onCommand:vscode-fracas.compileSelectedFracasObject",
         "onCommand:vscode-fracas.executeSelectionInRepl",
+        "onCommand:vscode-fracas.loadFileInRepl",
+        "onCommand:vscode-fracas.makeStringTableImport",
         "onCommand:vscode-fracas.openRepl",
+        "onCommand:vscode-fracas.precompileFracasFile",
+        "onCommand:vscode-fracas.recompileFracasObject",
+        "onCommand:vscode-fracas.runFile",
         "onCommand:vscode-fracas.showOutputTerminal",
         "onLanguage:racket"
     ],
@@ -102,19 +106,19 @@
                 "vscode-fracas.general.projectDir": {
                     "type": "string",
                     "default": "C:\\proj\\ws\\tdp1\\wslib",
-                    "markdownDescription": "Specifies the racket working directory and base directory for collection paths.",
+                    "markdownDescription": "`racket` working directory and base directory for collection paths.",
                     "order": 0
                 },
                 "vscode-fracas.general.racketPath": {
                     "type": "string",
                     "default": "C:\\Progra~1\\Racket\\racket.EXE",
-                    "markdownDescription": "Specifies the path to the `racket` executable used to launch the Racket language server.",
+                    "markdownDescription": "Path to the `racket` executable used to launch the Racket language server.",
                     "order": 1
                 },
                 "vscode-fracas.general.REPLRacketPath": {
                     "type": "string",
                     "default": "C:\\Progra~1\\Racket\\racket.EXE",
-                    "markdownDescription": "Specifies the path to the `racket` executable used to open the REPL and run the file.",
+                    "markdownDescription": "Path to the `racket` executable used to open the REPL and run the file.",
                     "order": 2
                 },
                 "vscode-fracas.general.racketCollectionPaths": {
@@ -126,14 +130,39 @@
                         ".",
                         "..\\fracas\\lib"
                     ],
-                    "markdownDescription": "A list of paths to search for Racket collections.",
+                    "markdownDescription": "Paths to search for Racket collections. Relative to `Project Dir`",
                     "order": 3
                 },
                 "vscode-fracas.general.ninjaPath": {
                     "type": "string",
                     "default": "ninja",
-                    "markdownDescription": "Specifies the path to the `ninja` executable used to precompile racket files.",
+                    "markdownDescription": "Path to the `ninja` executable used to precompile racket files.",
                     "order": 4
+                },
+                "vscode-fracas.localization.stringTableRegistryFile": {
+                    "type": "string",
+                    
+                    "default": "..\\tdp1.unreal\\Source\\Data\\TdpLocalization.cpp",
+                    "markdownDescription": "Path to the generated C++ source file that registers localized text tables with the UE4 project. Relative to *Project Dir*",
+                    "order": 1
+                },
+                "vscode-fracas.localization.stringTableSourcePaths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [
+                        "fracas\\localization-defines.frc",
+                        "fracas\\text\\localized-text*.frc"
+                    ],
+                    "markdownDescription": "Glob patterns of fracas source files containing localized text. Used to generated the *String Table Registry File*. Relative to `Project Dir`",
+                    "order": 2
+                },
+                "vscode-fracas.localization.stringTableDestDir": {
+                    "type": "string",
+                    "default": "..\\tdp1.unreal\\Content\\GameData\\Localization\\",
+                    "markdownDescription": "Directory with generated CSV files containing localized text tables. Relative to *Project Dir*",
+                    "order": 3
                 },
                 "vscode-fracas.trace.server": {
                     "scope": "window",
@@ -144,7 +173,7 @@
                         "verbose"
                     ],
                     "default": "off",
-                    "description": "Traces the communication between VS Code and the language server."
+                    "description": "Traces communication between VS Code and the language server."
                 },
                 "vscode-fracas.outputTerminal.numberOfOutputTerminals": {
                     "type": "string",
@@ -216,6 +245,10 @@
             {
                 "command": "vscode-fracas.recompileFracasObject",
                 "title": "Fracas: Recompile Previous Object"
+            },
+            {
+                "command": "vscode-fracas.makeStringTableImport",
+                "title": "Fracas: Make String Table CPP"
             },
             {
                 "command": "vscode-fracas.precompileFracasFile",
