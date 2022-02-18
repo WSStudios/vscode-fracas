@@ -1,6 +1,5 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
-import { workspace } from 'vscode';
-import { normalizeFilePath } from './utils';
 
 export function withEditor(func: (vscodeEditor: vscode.TextEditor) => void): void {
     const editor = vscode.window.activeTextEditor;
@@ -11,16 +10,8 @@ export function withEditor(func: (vscodeEditor: vscode.TextEditor) => void): voi
     }
 }
 
-export function getFilePath(): string | undefined {
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-        return normalizeFilePath(editor.document.fileName);
-    }
-    return undefined;
-}
-
 export function withFilePath(func: (filePath: string) => void): void {
-    withEditor((editor: vscode.TextEditor) => func(normalizeFilePath(editor.document.fileName)));
+    withEditor((editor: vscode.TextEditor) => func(path.resolve(editor.document.fileName)));
 }
 
 export function getRange(ranges: (vscode.Range | vscode.Range[])): vscode.Range {
@@ -35,7 +26,7 @@ export async function findTextInFiles(
     console.log(searchRx);
     const results: vscode.TextSearchMatch[] = [];
     try {
-        await workspace.findTextInFiles(
+        await vscode.workspace.findTextInFiles(
             { pattern: searchRx, isRegExp: true },
             {
                 include: include,
