@@ -61,6 +61,10 @@ export async function executeSelection(repls: Map<string, vscode.Terminal>): Pro
     }
 }
 
+/**
+ * finds all localized-text*.frc files, converts the filenames into .csv file
+ * names, and invokes racket to generate TdpLocalization.cpp/h
+ */
 export async function makeStringTableImport(): Promise<void> {
     const [racket, racketArgs] = getRacket();
     const stringTableCpp = vscode.workspace
