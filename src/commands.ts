@@ -61,7 +61,7 @@ export async function executeSelection(repls: Map<string, vscode.Terminal>): Pro
     }
 }
 
-export async function makeStringTableImport(document?: vscode.TextDocument): Promise<void> {
+export async function makeStringTableImport(): Promise<void> {
     const [racket, racketArgs] = getRacket();
     const stringTableCpp = vscode.workspace
         .getConfiguration("vscode-fracas.general")
@@ -77,9 +77,7 @@ export async function makeStringTableImport(document?: vscode.TextDocument): Pro
         .getConfiguration("vscode-fracas.localization")
         .get<string[]>("stringTableSourcePaths") || [];
 
-    document = document || vscode.window.activeTextEditor?.document;
-
-    if (racket && document) 
+    if (racket) 
     {
         const textFrcFiles = [];
         for (const pathPattern of stringTableSourcePaths) {

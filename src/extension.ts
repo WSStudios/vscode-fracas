@@ -94,16 +94,24 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeConfiguration(configurationChanged);
     
     // precompile fracas every time a file is saved
-    function handleSaveTextDocument(document: vscode.TextDocument) {
-        if (document && document.languageId === "fracas") {
-            com.precompileFracasFile(document);
-            const fileName = path.basename(document.fileName);
-            if (fileName.startsWith("localized-text") && fileName.endsWith(".frc")) {
-                com.makeStringTableImport(document);
-            }
+    function _maybeUpdateStringTables(uris: readonly vscode.Uri[]): void {
+        if (uris.some(uri => {
+            const fileName = path.basename(uri.path);
+            return fileName.startsWith("localized-text") && fileName.endsWith(".frc");
+        })) {
+            com.makeStringTableImport();
         }
     }
-    vscode.workspace.onDidSaveTextDocument(handleSaveTextDocument);
+    vscode.workspace.onDidSaveTextDocument(document => {
+        if (document && document.languageId === "fracas") {
+            com.precompileFracasFile(document);
+            _maybeUpdateStringTables([document.uri]);
+        }
+    });
+    vscode.workspace.onDidDeleteFiles(e => _maybeUpdateStringTables(e.files));
+    vscode.workspace.onDidCreateFiles(e => _maybeUpdateStringTables(e.files));
+    vscode.workspace.onDidRenameFiles(e => _maybeUpdateStringTables(
+        e.files.map(f => f.newUri).concat(e.files.map(f => f.oldUri))));
 
     vscode.window.onDidCloseTerminal((terminal) => {
         terminals.forEach((val, key) => val === terminal && terminals.delete(key) && val.dispose());
