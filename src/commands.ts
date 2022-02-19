@@ -66,7 +66,7 @@ export async function makeStringTableImport(): Promise<void> {
     const stringTableCpp = vscode.workspace
         .getConfiguration("vscode-fracas.general")
         .get<string>("stringTableRegistryFile") 
-        || "..\\tdp1.unreal\\Source\\Data\\Private\\Generated\\TdpLocalization.cpp";
+        || "..\\tdp1.unreal\\Source\\Data\\Private\\TdpLocalization.cpp";
     const projectDir = vscode.workspace
         .getConfiguration("vscode-fracas.general")
         .get<string>("projectDir") || ".";
