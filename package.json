@@ -3,7 +3,7 @@
     "publisher": "Wonderstorm",
     "displayName": "Fracas",
     "description": "Syntax highlighting, code navigation, document formatting, and REPL support for the Fracas and Racket programming languages",
-    "version": "0.1.9",
+    "version": "0.1.10",
     "enabledApiProposals": [
         "textSearchProvider",
         "findTextInFiles"
@@ -141,7 +141,6 @@
                 },
                 "vscode-fracas.localization.stringTableRegistryFile": {
                     "type": "string",
-                    
                     "default": "..\\tdp1.unreal\\Source\\Data\\TdpLocalization.cpp",
                     "markdownDescription": "Path to the generated C++ source file that registers localized text tables with the UE4 project. Relative to *Project Dir*",
                     "order": 1
