@@ -63,10 +63,10 @@ export async function executeSelection(repls: Map<string, vscode.Terminal>): Pro
 
 export async function makeStringTableImport(document?: vscode.TextDocument): Promise<void> {
     const [racket, racketArgs] = getRacket();
-    // const stringTableCpp = vscode.workspace
-    //     .getConfiguration("vscode-fracas.general")
-    //     .get<string>("stringTableRegistryFile") 
-    //     || "..\\tdp1.unreal\\Source\\Data\\Private\\Generated\\TdpLocalization.cpp";
+    const stringTableCpp = vscode.workspace
+        .getConfiguration("vscode-fracas.general")
+        .get<string>("stringTableRegistryFile") 
+        || "..\\tdp1.unreal\\Source\\Data\\Private\\Generated\\TdpLocalization.cpp";
     const projectDir = vscode.workspace
         .getConfiguration("vscode-fracas.general")
         .get<string>("projectDir") || ".";
@@ -93,6 +93,7 @@ export async function makeStringTableImport(document?: vscode.TextDocument): Pro
             return csvFile;
         });
 
+        console.log(`Generating ${textFrcFiles.length} text source files into "${stringTableCpp}"`);
         execShell(`${racket} ${racketArgs.join(" ")} ../fracas/lib/fracas/make-string-table-import.rkt -- ${csvFiles.join(" ")}`);
     }
 }

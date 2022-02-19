@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-// eslint-disable-next-line no-unused-vars
+import * as path from "path";
 import { LanguageClient, LanguageClientOptions } from "vscode-languageclient/node";
 import * as com from "./commands";
 import { withRacket } from "./utils";
@@ -94,7 +94,16 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeConfiguration(configurationChanged);
     
     // precompile fracas every time a file is saved
-    vscode.workspace.onDidSaveTextDocument((document) => com.precompileFracasFile(document));
+    function handleSaveTextDocument(document: vscode.TextDocument) {
+        if (document && document.languageId === "fracas") {
+            com.precompileFracasFile(document);
+            const fileName = path.basename(document.fileName);
+            if (fileName.startsWith("localized-text") && fileName.endsWith(".frc")) {
+                com.makeStringTableImport(document);
+            }
+        }
+    }
+    vscode.workspace.onDidSaveTextDocument(handleSaveTextDocument);
 
     vscode.window.onDidCloseTerminal((terminal) => {
         terminals.forEach((val, key) => val === terminal && terminals.delete(key) && val.dispose());
