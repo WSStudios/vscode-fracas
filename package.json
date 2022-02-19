@@ -130,7 +130,7 @@
                         ".",
                         "..\\fracas\\lib"
                     ],
-                    "markdownDescription": "Paths to search for Racket collections. Relative to `Project Dir`",
+                    "markdownDescription": "Paths to search for Racket collections. Relative to __Project Dir__",
                     "order": 3
                 },
                 "vscode-fracas.general.ninjaPath": {
@@ -142,8 +142,8 @@
                 "vscode-fracas.localization.stringTableRegistryFile": {
                     "type": "string",
                     "default": "..\\tdp1.unreal\\Source\\Data\\TdpLocalization.cpp",
-                    "markdownDescription": "Path to the generated C++ source file that registers localized text tables with the UE4 project. Relative to *Project Dir*",
-                    "order": 1
+                    "markdownDescription": "Path to the generated C++ source file that registers localized text tables with the UE4 project. Relative to __Project Dir__",
+                    "order": 5
                 },
                 "vscode-fracas.localization.stringTableSourcePaths": {
                     "type": "array",
@@ -154,14 +154,14 @@
                         "fracas\\localization-defines.frc",
                         "fracas\\text\\localized-text*.frc"
                     ],
-                    "markdownDescription": "Glob patterns of fracas source files containing localized text. Used to generated the *String Table Registry File*. Relative to `Project Dir`",
-                    "order": 2
+                    "markdownDescription": "Glob patterns of fracas source files containing localized text. Used to generated the *String Table Registry File*. Relative to __Project Dir__",
+                    "order": 6
                 },
                 "vscode-fracas.localization.stringTableDestDir": {
                     "type": "string",
                     "default": "..\\tdp1.unreal\\Content\\GameData\\Localization\\",
-                    "markdownDescription": "Directory with generated CSV files containing localized text tables. Relative to *Project Dir*",
-                    "order": 3
+                    "markdownDescription": "Directory with generated CSV files containing localized text tables. Relative to __Project Dir__",
+                    "order": 7
                 },
                 "vscode-fracas.trace.server": {
                     "scope": "window",
