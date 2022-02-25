@@ -15,7 +15,7 @@ export const RX_CHARS_OPEN_PAREN = '\\(|\\{|\\[';
 export const RX_CHARS_CLOSE_PAREN = '\\)|\\}|\\]';
 export const RX_CHARS_SPACE = '\\s|\\r|\\n';
 export const RX_CHAR_IDENTIFIER = '[\\w\\-\\*\\.]';
-export const RX_SYMBOLS_DEFINE = 'define-enum|define-game-data|define-key|define-text|define-mask|define-type-optional|define-syntax|define-type|define-variant|define';
+export const RX_SYMBOLS_DEFINE = 'define-enum|define-game-data|define-key|define-text|define-string-table|define-mask|define-type-optional|define-syntax|define-syntax-rule|define-type|define-variant|define|define-list';
 export const RX_COMMENT = ';;?\\s*(.*)\\s*$';
 
 export enum FracasDefinitionKind {
