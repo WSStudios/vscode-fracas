@@ -104,7 +104,7 @@ export function compileFracasObject(filePath: string, fracasObject: string): voi
     const [racket, racketArgs] = getRacket();
     if (fracasObject && filePath && racket) {
         vscode.window.activeTextEditor?.document?.save();
-        const cmd = `(require fracas/make-asset-json) (enter! (file "${filePath}")) (define-asset-impl: #:value ${fracasObject} #:value-name (quote ${fracasObject}) #:key (key: ${fracasObject}))`;
+        const cmd = `(require fracas/make-asset) (enter! (file "${filePath}")) (define-asset-impl: #:value ${fracasObject} #:value-name (quote ${fracasObject}) #:key (key: ${fracasObject}))`;
         execShell(`${racket} ${racketArgs.join(" ")} -e "${cmd.replace(/"/g, '\\"')}"`);
     }
 }
