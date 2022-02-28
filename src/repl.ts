@@ -1,6 +1,7 @@
+import path = require("path");
 import * as vscode from "vscode";
 import { asyncGetOrDefault } from "./containers";
-import { delay, fileName, getRacket } from "./utils";
+import { delay, getRacket } from "./utils";
 
 export async function withRepl(
     repls: Map<string, vscode.Terminal>,
@@ -61,7 +62,7 @@ export function createTerminal(filePath: string | null): vscode.Terminal {
             .getConfiguration("vscode-fracas.outputTerminal")
             .get("outputTerminalTitle");
         const template = templateSetting && templateSetting !== "" ? templateSetting : "Output ($name)";
-        terminal = vscode.window.createTerminal(template.replace("$name", fileName(filePath)));
+        terminal = vscode.window.createTerminal(template.replace("$name", path.basename(filePath)));
     } else {
         const templateSetting: string | undefined = vscode.workspace
             .getConfiguration("vscode-fracas.outputTerminal")
