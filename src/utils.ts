@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as cp from "child_process";
+import * as path from "path";
 
 export function execShell(cmd: string, workingDir: string | undefined = undefined) : Promise<string> {
     return new Promise<string>((resolve, reject) => {
@@ -15,24 +16,18 @@ export function execShell(cmd: string, workingDir: string | undefined = undefine
     });
 }
 
+export function kebabCaseToPascalCase(input: string): string
+{
+  return input
+    .split("-")
+    .reduce((camel, word, index) => {
+        const pascalWord = word.substring(1).toLowerCase();
+        return `${camel}${word.charAt(0).toUpperCase()}${pascalWord}`;
+    }, "");
+}
+
 export function openRacketReference(symbol: string): void {
     vscode.env.openExternal(vscode.Uri.parse(`https://docs.racket-lang.org/search/index.html?q=${encodeURI(symbol)}`));
-}
-
-export function fileName(filePath: string): string {
-    const match = filePath.match(/^.*\/([^/]+\.[^/]+)$/);
-    if (match) {
-        return match[1];
-    }
-    vscode.window.showErrorMessage("Invalid file name.");
-    return "";
-}
-
-export function normalizeFilePath(filePath: string): string {
-    if (process.platform === "win32") {
-        return filePath.replace(/\\/g, "/");
-    }
-    return filePath;
 }
 
 export function delay(ms: number) : Promise<void> {
@@ -56,8 +51,8 @@ export function getRacket(server = false) : [string,string[]] {
         .getConfiguration("vscode-fracas.general")
         .get<string[]>("racketCollectionPaths") || [];
     const racketArgs = [];
-    for (const path of collectPaths) {
-        racketArgs.push("-S", normalizeFilePath(`${projectDir}/${path}`));
+    for (const collectPath of collectPaths) {
+        racketArgs.push("-S", path.resolve(`${projectDir}\\${collectPath}`));
     }
     return [racket, racketArgs];
 }

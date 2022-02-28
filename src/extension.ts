@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-// eslint-disable-next-line no-unused-vars
+import * as path from "path";
 import { LanguageClient, LanguageClientOptions } from "vscode-languageclient/node";
 import * as com from "./commands";
 import { withRacket } from "./utils";
@@ -94,7 +94,24 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeConfiguration(configurationChanged);
     
     // precompile fracas every time a file is saved
-    vscode.workspace.onDidSaveTextDocument((document) => com.precompileFracasFile(document));
+    function _maybeUpdateStringTables(uris: readonly vscode.Uri[]): void {
+        if (uris.some(uri => {
+            const fileName = path.basename(uri.path);
+            return fileName.startsWith("localized-text") && fileName.endsWith(".frc");
+        })) {
+            com.makeStringTableImport();
+        }
+    }
+    vscode.workspace.onDidSaveTextDocument(document => {
+        if (document && document.languageId === "fracas") {
+            com.precompileFracasFile(document);
+            _maybeUpdateStringTables([document.uri]);
+        }
+    });
+    vscode.workspace.onDidDeleteFiles(e => _maybeUpdateStringTables(e.files));
+    vscode.workspace.onDidCreateFiles(e => _maybeUpdateStringTables(e.files));
+    vscode.workspace.onDidRenameFiles(e => _maybeUpdateStringTables(
+        e.files.map(f => f.newUri).concat(e.files.map(f => f.oldUri))));
 
     vscode.window.onDidCloseTerminal((terminal) => {
         terminals.forEach((val, key) => val === terminal && terminals.delete(key) && val.dispose());
@@ -106,6 +123,7 @@ export function activate(context: vscode.ExtensionContext): void {
         reg("compileSelectedFracasObject", () => com.compileSelectedFracasObject()),
         reg("recompileFracasObject", () => com.recompileFracasObject()),
         reg("precompileFracasFile", () => com.precompileFracasFile()),
+        reg("makeStringTableImport", () => com.makeStringTableImport()),
         reg("loadFileInRepl", () => com.loadInRepl(repls)),
         reg("runFile", () => com.runInTerminal(terminals)),
         reg("executeSelectionInRepl", () => com.executeSelection(repls)),
