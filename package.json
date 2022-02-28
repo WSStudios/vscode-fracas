@@ -3,11 +3,7 @@
     "publisher": "Wonderstorm",
     "displayName": "Fracas",
     "description": "Syntax highlighting, code navigation, document formatting, and REPL support for the Fracas and Racket programming languages",
-<<<<<<< jmcelmurray/13327-define-syntax-rule-support
-    "version": "0.1.9",
-=======
-    "version": "0.1.10",
->>>>>>> master
+    "version": "0.1.11",
     "enabledApiProposals": [
         "textSearchProvider",
         "findTextInFiles"
