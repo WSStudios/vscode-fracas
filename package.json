@@ -3,7 +3,7 @@
     "publisher": "Wonderstorm",
     "displayName": "Fracas",
     "description": "Syntax highlighting, code navigation, document formatting, and REPL support for the Fracas and Racket programming languages",
-    "version": "0.1.13",
+    "version": "0.1.14",
     "enabledApiProposals": [
         "textSearchProvider",
         "findTextInFiles"
@@ -290,8 +290,8 @@
                     "group": "z_commands"
                 },
                 {
-                      "command": "vscode-fracas.ue4OpenAsset",
-                      "group": "z_commands"
+                    "command": "vscode-fracas.ue4OpenAsset",
+                    "group": "z_commands"
                 }
             ]
         },
