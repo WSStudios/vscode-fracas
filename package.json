@@ -3,7 +3,7 @@
     "publisher": "Wonderstorm",
     "displayName": "Fracas",
     "description": "Syntax highlighting, code navigation, document formatting, and REPL support for the Fracas and Racket programming languages",
-    "version": "0.1.11",
+    "version": "0.1.13",
     "enabledApiProposals": [
         "textSearchProvider",
         "findTextInFiles"
@@ -30,6 +30,7 @@
         "onCommand:vscode-fracas.recompileFracasObject",
         "onCommand:vscode-fracas.runFile",
         "onCommand:vscode-fracas.showOutputTerminal",
+        "onCommand:vscode-fracas.ue4OpenAsset",
         "onLanguage:racket"
     ],
     "main": "./out/extension.js",
@@ -53,7 +54,7 @@
         "repl"
     ],
     "author": {
-        "name": "Evžen Wybitul, Jeff Shaffer, Dave Smith"
+        "name": "Evžen Wybitul, Jeff Shaffer, Dave Smith, John McElmurray"
     },
     "contributes": {
         "configurationDefaults": {
@@ -61,7 +62,13 @@
                 "editor.rulers": [
                     102
                 ],
-                "editor.wordSeparators": "()[]{}\",'`;#|"
+                "editor.wordSeparators": "()[]{}\",'`;#|:"
+            },
+            "[fracas]": {
+                "editor.rulers": [
+                    102
+                ],
+                "editor.wordSeparators": "()[]{}\",'`;#|:"
             }
         },
         "languages": [
@@ -252,6 +259,10 @@
             {
                 "command": "vscode-fracas.precompileFracasFile",
                 "title": "Fracas: Precompile File"
+            },
+            {
+                "command": "vscode-fracas.ue4OpenAsset",
+                "title": "UE4: Open Asset"
             }
         ],
         "menus": {
@@ -304,6 +315,11 @@
             {
                 "command": "vscode-fracas.recompileFracasObject",
                 "key": "Ctrl+; Ctrl+;",
+                "when": "resourceLangId == fracas"
+            },
+            {
+                "command": "vscode-fracas.ue4OpenAsset",
+                "key": "Ctrl+; Ctrl+o",
                 "when": "resourceLangId == fracas"
             },
             {

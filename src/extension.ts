@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { LanguageClient, LanguageClientOptions } from "vscode-languageclient/node";
 import * as com from "./commands";
+import * as ue4 from "./ue4";
 import { withRacket } from "./utils";
 import { FracasCompletionItemProvider } from './fracas/completion-item-provider';
 import { FracasDefinitionProvider } from './fracas/definition-provider';
@@ -129,7 +130,8 @@ export function activate(context: vscode.ExtensionContext): void {
         reg("executeSelectionInRepl", () => com.executeSelection(repls)),
         reg("openRepl", () => com.openRepl(repls)),
         reg("showOutputTerminal", () => com.showOutput(terminals)),
-        reg("helpWithSelectedSymbol", () => com.helpWithSelectedSymbol()));
+        reg("helpWithSelectedSymbol", () => com.helpWithSelectedSymbol()),
+        reg("ue4OpenAsset", () => ue4.ue4OpenEditorForAsset()));
 
     // Register FRACAS language support
     context.subscriptions.push(
