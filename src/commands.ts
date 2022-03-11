@@ -11,7 +11,6 @@ import {
     executeSelectionInRepl,
     withRepl,
 } from "./repl";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { 
     execShell, 
     getRacket, 
@@ -28,8 +27,12 @@ export function helpWithSelectedSymbol(): void {
 }
 
 export function runInTerminal(terminals: Map<string, vscode.Terminal>): void {
-    withFilePath((filePath: string) => {
-        withRacket((racket: string, racketArgs: string[]) => {
+    withRacket((racket: string, racketArgs: string[]) => {
+        const document = vscode.window.activeTextEditor?.document;
+        if (document) {
+            document.save();
+            const filePath = path.resolve(document.fileName);
+
             let terminal;
             if (
                 vscode.workspace
@@ -41,16 +44,20 @@ export function runInTerminal(terminals: Map<string, vscode.Terminal>): void {
                 terminal = getOrDefault(terminals, filePath, () => createTerminal(filePath));
             }
             runFileInTerminal(racket, racketArgs, filePath, terminal);
-        });
+        }
     });
 }
 
 export function loadInRepl(repls: Map<string, vscode.Terminal>): void {
-    withFilePath((filePath: string) => {
-        withRacket((racket: string, racketArgs: string[]) => {
+    withRacket((racket: string, racketArgs: string[]) => {
+        const document = vscode.window.activeTextEditor?.document;
+        if (document) {
+            document.save();
+            const filePath = path.resolve(document.fileName);
+
             const repl = getOrDefault(repls, filePath, () => createRepl(path.basename(filePath), racket, racketArgs));
             loadFileInRepl(filePath, repl);
-        });
+        }
     });
 }
 
