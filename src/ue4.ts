@@ -1,35 +1,49 @@
 import * as http from 'http';
 import * as vscode from "vscode";
 
-export async function ue4OpenEditorForAsset(assetPath?: string): Promise<void> {
-    if (!assetPath) {
-        // if no assetPath is provided, use the current selection
-        const activeEditor = vscode.window.activeTextEditor;
-        const document = activeEditor?.document;
-        let wordRange: vscode.Range | undefined = activeEditor?.selection;
-        if (!document || !wordRange) {
-            return;
-        }
+export function ue4GetSelectedAssetPaths(): string[] {
+    // if no assetPath is provided, use the current selection
+    const activeEditor = vscode.window.activeTextEditor;
+    const document = activeEditor?.document;
+    const selections: readonly vscode.Selection[] | undefined = activeEditor?.selections;
+    if (!document || !selections) {
+        return [];
+    }
 
+    // Resolve selections into asset paths
+    // NameTypes.h
+    // /** These characters cannot be used in ObjectPaths, which includes both the package path and part after the first . */
+    // #define INVALID_OBJECTPATH_CHARACTERS	TEXT("\"' ,|&!~\n\r\t@#(){}[]=;^%$`")
+    const kInvalidObjectPathCharacters = /[^" ,|&!~\n\r\t@#(){}[\]=;^%$`]+/; // allow ' because we strip it out later
+    const assetPaths = selections.map(selection => { 
         // if the selection is empty, use the string under the cursor
-        if (wordRange.isEmpty) {
-            wordRange = document.getWordRangeAtPosition(wordRange.start, /[^"]+/);
-        }
-        assetPath = document.getText(wordRange);
+        const range = !selection.isEmpty ? selection :
+            document.getWordRangeAtPosition(selection.active, kInvalidObjectPathCharacters);
+        let assetPath = document.getText(range);
 
         // extract the asset path from a typed reference, e.g. "Texture2D'/Game/MyTexture.MyTexture'"
-        const typeSeparator = assetPath?.indexOf("'");
+        const typeSeparator = assetPath.indexOf("'");
         if (typeSeparator >= 0) {
             assetPath = assetPath.substring(typeSeparator + 1, assetPath.length - 1);
         }
+
+        return assetPath;
+    });    
+
+    return assetPaths;
+}
+
+export async function ue4OpenEditorsForAssets(assetPaths?: string[]): Promise<void> {
+    if (!assetPaths) {
+        assetPaths = ue4GetSelectedAssetPaths();
     }
 
-    if (assetPath) {
+    if (assetPaths && assetPaths.length > 0) {
         ue4RemoteObjectCall(
             "/Script/TdpEditor.Default__TdpAssetLibrary",
-            "OpenEditorForAsset", 
+            "OpenEditorsForAssets", 
             // eslint-disable-next-line @typescript-eslint/naming-convention
-            { "AssetPathName": assetPath });
+            { "AssetsToOpen": assetPaths });
     }
 }
 

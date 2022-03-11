@@ -131,7 +131,7 @@ export function activate(context: vscode.ExtensionContext): void {
         reg("openRepl", () => com.openRepl(repls)),
         reg("showOutputTerminal", () => com.showOutput(terminals)),
         reg("helpWithSelectedSymbol", () => com.helpWithSelectedSymbol()),
-        reg("ue4OpenAsset", () => ue4.ue4OpenEditorForAsset()));
+        reg("ue4OpenAsset", () => ue4.ue4OpenEditorsForAssets()));
 
     // Register FRACAS language support
     context.subscriptions.push(

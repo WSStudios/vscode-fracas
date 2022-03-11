@@ -262,7 +262,7 @@
             },
             {
                 "command": "vscode-fracas.ue4OpenAsset",
-                "title": "UE4: Open Asset"
+                "title": "UE4: Open Asset(s)"
             }
         ],
         "menus": {
@@ -288,6 +288,10 @@
                     "when": "resourceLangId == fracas && editorHasSelection",
                     "command": "vscode-fracas.executeSelectionInRepl",
                     "group": "z_commands"
+                },
+                {
+                      "command": "vscode-fracas.ue4OpenAsset",
+                      "group": "z_commands"
                 }
             ]
         },
@@ -319,8 +323,7 @@
             },
             {
                 "command": "vscode-fracas.ue4OpenAsset",
-                "key": "Ctrl+; Ctrl+o",
-                "when": "resourceLangId == fracas"
+                "key": "Ctrl+; Ctrl+o"
             },
             {
                 "command": "vscode-fracas.helpWithSelectedSymbol",
