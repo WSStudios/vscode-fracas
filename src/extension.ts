@@ -3,6 +3,10 @@ import * as path from "path";
 import { LanguageClient, LanguageClientOptions } from "vscode-languageclient/node";
 import * as com from "./commands";
 import * as ue4 from "./ue4";
+import { 
+    loadProjectConfig, 
+    setFormatterScript 
+} from "./config";
 import { withRacket } from "./utils";
 import { FracasCompletionItemProvider } from './fracas/completion-item-provider';
 import { FracasDefinitionProvider } from './fracas/definition-provider';
@@ -10,15 +14,15 @@ import { fracasDocumentFilter } from "./fracas/document-filter";
 import { FracasReferenceProvider } from "./fracas/reference-provider";
 import { FracasDocumentSymbolProvider } from "./fracas/document-symbol-provider";
 import { FracasHoverProvider } from "./fracas/hover-provider";
+import { FracasDocumentFormattingEditProvider } from "./fracas/document-formatting-edit-provider";
 
 let langClient: LanguageClient;
-let isLangClientRunning = false;
 
 export function deactivate(): Promise<void> {
-    if (!langClient) {
-        return Promise.reject(new Error("There is no language server client to be deactivated"));
+    if (!!langClient && langClient.needsStop()) {
+        return langClient.stop();
     }
-    return langClient.stop();
+    return Promise.resolve();
 }
 
 function setupLSP() {
@@ -38,11 +42,11 @@ function setupLSP() {
         // Options to control the language client
         const clientOptions: LanguageClientOptions = {
             // Register the server for racket documents
-            documentSelector: [{ scheme: "file", language: "racket" }],
-            synchronize: {
-                // Notify the server about file changes to '.clientrc files contained in the workspace
-                fileEvents: vscode.workspace.createFileSystemWatcher("**/.clientrc"),
-            },
+            documentSelector: [{ scheme: "file", language: "racket" } /* , { scheme: "file", language: "fracas" } */],
+            // synchronize: {
+            //     // Notify the server about file changes to '.clientrc files contained in the workspace
+            //     fileEvents: vscode.workspace.createFileSystemWatcher("**/.clientrc"),
+            // },
             uriConverters: {
                 code2Protocol: (uri) => uri.toString(true),
                 protocol2Code: (str) => vscode.Uri.parse(str),
@@ -58,6 +62,7 @@ function setupLSP() {
             serverOptions,
             clientOptions,
         );
+
     }, true);
 }
 
@@ -66,25 +71,41 @@ function reg(name: string, func: (...args: any[]) => any) {
     return vscode.commands.registerCommand(`vscode-fracas.${name}`, func);
 }
 
-function configurationChanged() {
+async function configurationChanged() {
     const enableLSP: boolean = vscode.workspace
         .getConfiguration("vscode-fracas.lsp")
         .get("enabled", true);
 
+    if (!langClient) {
+        setupLSP();
+    }
+
     if (langClient) {
-        if (enableLSP && !isLangClientRunning) {
+        if (enableLSP && langClient.needsStart()) {
             langClient.start();
-            isLangClientRunning = true;
-        } else if (!enableLSP && isLangClientRunning) {
+        } else if (!enableLSP && langClient.needsStop()) {
             langClient.stop();
-            isLangClientRunning = false;
         }
     }
+
+    await loadProjectConfig();
 }
 
-export function activate(context: vscode.ExtensionContext): void {
-    setupLSP();
-    configurationChanged();
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+    const loadConfigTask = loadProjectConfig();
+
+    const one = 'beep boop';
+    const other = 'beep boob blah';
+
+    const diff = diffChars(one, other);
+
+    for (const part of diff) {
+        const op = 
+            part.added ? 'add' :
+            part.removed ? 'remove' :
+            'same';
+        console.log(`${op}[${part.count}]: ${part.value}`);
+    }
 
     // Each file has one output terminal and one repl
     // Those two are saved in terminals and repls, respectively
@@ -93,7 +114,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const repls: Map<string, vscode.Terminal> = new Map();
 
     vscode.workspace.onDidChangeConfiguration(configurationChanged);
-    
+
     // precompile fracas every time a file is saved
     function _maybeUpdateStringTables(uris: readonly vscode.Uri[]): void {
         if (uris.some(uri => {
@@ -103,9 +124,9 @@ export function activate(context: vscode.ExtensionContext): void {
             com.makeStringTableImport();
         }
     }
-    vscode.workspace.onDidSaveTextDocument(document => {
+    vscode.workspace.onDidSaveTextDocument(async document => {
         if (document && document.languageId === "fracas") {
-            com.precompileFracasFile(document);
+            await com.precompileFracasFile(document);
             _maybeUpdateStringTables([document.uri]);
         }
     });
@@ -144,5 +165,13 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.languages.registerHoverProvider(fracasDocumentFilter, new FracasHoverProvider()));
     context.subscriptions.push(
         vscode.languages.registerCompletionItemProvider(fracasDocumentFilter, new FracasCompletionItemProvider()));
-
+    context.subscriptions.push(
+        vscode.languages.registerDocumentFormattingEditProvider(fracasDocumentFilter, new FracasDocumentFormattingEditProvider()));
+    
+    await loadConfigTask; // wait for config files to fully load before exiting activation.
+    
+    // save the location of yasi for use in document formatting.
+    setFormatterScript(context.asAbsolutePath("resources/python/yasi_ws.py"));
+    // maybe start language server. must be called after loading config so that racket.exe is resolved
+    await configurationChanged();
 }
