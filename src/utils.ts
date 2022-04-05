@@ -1,11 +1,12 @@
 import * as vscode from "vscode";
 import * as cp from "child_process";
-import { getRacket, getRacketShellCmd } from "./config";
+import { getProjectDir, getRacket, getRacketShellCmd } from "./config";
+import stream = require("stream");
 
-export function execShell(cmd: string, workingDir: string | undefined = undefined) : Promise<string> {
+export function execShell(cmd: string, input?: string, workingDir?: string) : Promise<string> {
     return new Promise<string>((resolve, reject) => {
-        cp.exec(cmd, 
-            { cwd: workingDir || vscode.workspace.getConfiguration("vscode-fracas.general").get<string>("projectDir") },
+        const child = cp.exec(cmd, 
+            { cwd: workingDir || getProjectDir() },
             (err, out) => {
                 if (err) {
                     vscode.window.showErrorMessage(err.message);
@@ -13,6 +14,13 @@ export function execShell(cmd: string, workingDir: string | undefined = undefine
                 }
                 return resolve(out);
             });
+
+        if (input && child.stdin) {
+            const stdinStream = new stream.Readable();
+            stdinStream.push(input);  // Add data to the internal queue for users of the stream to consume
+            stdinStream.push(null);   // Signals the end of the stream (EOF)
+            stdinStream.pipe(child.stdin);            
+        }
     });
 }
 
@@ -20,6 +28,7 @@ export function kebabCaseToPascalCase(input: string): string
 {
   return input
     .split("-")
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     .reduce((camel, word, index) => {
         const pascalWord = word.substring(1).toLowerCase();
         return `${camel}${word.charAt(0).toUpperCase()}${pascalWord}`;
