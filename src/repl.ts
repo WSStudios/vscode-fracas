@@ -1,7 +1,8 @@
 import path = require("path");
 import * as vscode from "vscode";
+import { getRacketShellCmd } from "./config";
 import { asyncGetOrDefault } from "./containers";
-import { delay, getRacket } from "./utils";
+import { delay } from "./utils";
 
 export async function withRepl(
     repls: Map<string, vscode.Terminal>,
@@ -9,11 +10,11 @@ export async function withRepl(
     callback: (terminal: vscode.Terminal, editor: vscode.TextEditor) => void,
 ): Promise<void> {
     const editor = vscode.window.activeTextEditor;
-    const [racket, racketArgs] = getRacket();
-    if (replKey && editor && racket) {
+    const racketCmd = getRacketShellCmd();
+    if (replKey && editor && racketCmd) {
         const repl = await asyncGetOrDefault(repls, replKey, async () => {
-            const newRepl = createRepl(replKey, racket, racketArgs);
-            await delay(3000);
+            const newRepl = createRepl(replKey, racketCmd);
+            await delay(3000); // allow for repl to start
             return newRepl;
         });
         callback(repl, editor);
@@ -32,8 +33,7 @@ export function executeSelectionInRepl(repl: vscode.Terminal, editor: vscode.Tex
 }
 
 export function runFileInTerminal(
-    racket: string,
-    racketArgs: string[],
+    racketCmd: string,
     filePath: string,
     terminal: vscode.Terminal,
 ): void {
@@ -44,9 +44,9 @@ export function runFileInTerminal(
         .get("windows");
     if (process.platform === "win32" && shell && /cmd\.exe$/.test(shell)) {
         // cmd.exe doesn't recognize single quotes
-        terminal.sendText(`${racket} ${racketArgs.join(" ")} "${filePath}"`);
+        terminal.sendText(`${racketCmd} "${filePath}"`);
     } else {
-        terminal.sendText(`${racket} ${racketArgs.join(" ")} '${filePath}'`);
+        terminal.sendText(`${racketCmd} '${filePath}'`);
     }
 }
 
@@ -74,13 +74,13 @@ export function createTerminal(filePath: string | null): vscode.Terminal {
     return terminal;
 }
 
-export function createRepl(replKey: string, racket: string, racketArgs: string[]): vscode.Terminal {
+export function createRepl(replKey: string, racketCmd: string): vscode.Terminal {
     const templateSetting: string | undefined = vscode.workspace
         .getConfiguration("vscode-fracas.repl")
         .get("replTitle");
     const template = templateSetting || "REPL ($name)";
     const repl = vscode.window.createTerminal(template.replace("$name", replKey));
     repl.show();
-    repl.sendText(`${racket} ${racketArgs.join(" ")}`);
+    repl.sendText(racketCmd);
     return repl;
 }
