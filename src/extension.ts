@@ -3,9 +3,9 @@ import * as path from "path";
 import { LanguageClient, LanguageClientOptions } from "vscode-languageclient/node";
 import * as com from "./commands";
 import * as ue4 from "./ue4";
-import { 
-    loadProjectConfig, 
-    setFormatterScript 
+import {
+    loadProjectConfig,
+    setFormatterScript
 } from "./config";
 import { withRacket } from "./utils";
 import { FracasCompletionItemProvider } from './fracas/completion-item-provider';
@@ -94,19 +94,6 @@ async function configurationChanged() {
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     const loadConfigTask = loadProjectConfig();
 
-    const one = 'beep boop';
-    const other = 'beep boob blah';
-
-    const diff = diffChars(one, other);
-
-    for (const part of diff) {
-        const op = 
-            part.added ? 'add' :
-            part.removed ? 'remove' :
-            'same';
-        console.log(`${op}[${part.count}]: ${part.value}`);
-    }
-
     // Each file has one output terminal and one repl
     // Those two are saved in terminals and repls, respectively
     // The file is _ran_ in the terminal and _loaded_ into a repl
@@ -165,11 +152,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.languages.registerHoverProvider(fracasDocumentFilter, new FracasHoverProvider()));
     context.subscriptions.push(
         vscode.languages.registerCompletionItemProvider(fracasDocumentFilter, new FracasCompletionItemProvider()));
-    context.subscriptions.push(
-        vscode.languages.registerDocumentFormattingEditProvider(fracasDocumentFilter, new FracasDocumentFormattingEditProvider()));
-    
+    const fracasFormatter = new FracasDocumentFormattingEditProvider();
+    context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider(
+        fracasDocumentFilter, fracasFormatter));
+    context.subscriptions.push(vscode.languages.registerDocumentRangeFormattingEditProvider(
+        fracasDocumentFilter, fracasFormatter));
+
     await loadConfigTask; // wait for config files to fully load before exiting activation.
-    
+
     // save the location of yasi for use in document formatting.
     setFormatterScript(context.asAbsolutePath("resources/python/yasi_ws.py"));
     // maybe start language server. must be called after loading config so that racket.exe is resolved

@@ -145,7 +145,8 @@ export async function precompileFracasFile(frcDoc: vscode.TextDocument | undefin
 
         // Invoke ninja to update all precompiled zo file dependencies
         console.log(`Precompiling fracas files because ${frcDoc.fileName} has changed`);
-        const ninjaCmd = `${ninja} -f ./build/build_precompile.ninja`;
+        const precompileNinjaFile = path.join("build", "build_precompile.ninja");
+        const ninjaCmd = `"${ninja}" -f "${precompileNinjaFile}"`;
         console.log(ninjaCmd);
         await execShell(ninjaCmd);
     }
@@ -171,7 +172,8 @@ export function showOutput(terminals: Map<string, vscode.Terminal>): void {
     });
 }
 
-export async function formatFile(frcDoc: vscode.TextDocument | undefined = undefined): Promise<vscode.TextEdit[]> {
+export async function formatDocument(frcDoc?: vscode.TextDocument, range?: vscode.Range)
+: Promise<vscode.TextEdit[]> {
     // use the open document if none is provided
     if (frcDoc === undefined) {
         frcDoc = vscode.window.activeTextEditor?.document;
@@ -179,12 +181,10 @@ export async function formatFile(frcDoc: vscode.TextDocument | undefined = undef
 
     // if there is a fracas document, format it
     if (frcDoc !== undefined) {
-        frcDoc.save(); // save the document before formatting
-
         // Invoke yasi to generate formatted text.
-        const formatCmd = `${getPython()} ${getFormatterScript()} ${frcDoc.fileName}`;
+        const formatCmd = `"${getPython()}" "${getFormatterScript()}" --no-modify "${frcDoc.fileName}"`;
         console.log(formatCmd);
-        const preFormattedText = await execShell(formatCmd);
+        const preFormattedText = await execShell(formatCmd, frcDoc.getText());
         if (!preFormattedText) {
             return [];
         }
@@ -194,17 +194,19 @@ export async function formatFile(frcDoc: vscode.TextDocument | undefined = undef
             preFormattedText.replace(/\r\n/g, "\n") :
             preFormattedText.replace(/\r\r?\n/g, "\r\n");
 
-        // compute diff and convert changes to vscode edits
+        // compute diff
         const changes = diffChars(frcDoc.getText(), formattedText);
         const edits: vscode.TextEdit[] = [];
         let offset = 0;
         for (const change of changes) {
-            if (change.added) {
-                edits.push(vscode.TextEdit.insert(frcDoc.positionAt(offset), change.value));
-            } else if (change.removed) {
-                edits.push(vscode.TextEdit.delete(new vscode.Range(
-                    frcDoc.positionAt(offset),
-                    frcDoc.positionAt(offset + change.value.length))));
+            const position = frcDoc.positionAt(offset);
+            if (range === undefined || range.contains(position)) {
+                if (change.added) {
+                    edits.push(vscode.TextEdit.insert(position, change.value));
+                } else if (change.removed) {
+                    edits.push(vscode.TextEdit.delete(
+                        new vscode.Range(position, frcDoc.positionAt(offset + change.value.length))));
+                }
             }
             offset += change.count || 0;
         }
