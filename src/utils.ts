@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as cp from "child_process";
-import * as path from "path";
+import { getRacket, getRacketShellCmd } from "./config";
 
 export function execShell(cmd: string, workingDir: string | undefined = undefined) : Promise<string> {
     return new Promise<string>((resolve, reject) => {
@@ -34,32 +34,16 @@ export function delay(ms: number) : Promise<void> {
     return new Promise( resolve => setTimeout(resolve, ms) );
 }
 
-export function getRacket(server = false) : [string,string[]] {
-    const racketPathKey = server ? "racketPath" : "REPLRacketPath";
-    const racket = vscode.workspace
-        .getConfiguration("vscode-fracas.general")
-        .get<string>(racketPathKey) || "racket";
-    if (!racket) {
-        vscode.window.showErrorMessage(
-            "No Racket executable specified. Please add the path to the Racket executable in settings",
-        );
-    }
-    const projectDir = vscode.workspace
-        .getConfiguration("vscode-fracas.general")
-        .get<string>("projectDir") || [];
-    const collectPaths = vscode.workspace
-        .getConfiguration("vscode-fracas.general")
-        .get<string[]>("racketCollectionPaths") || [];
-    const racketArgs = [];
-    for (const collectPath of collectPaths) {
-        racketArgs.push("-S", path.resolve(`${projectDir}\\${collectPath}`));
-    }
-    return [racket, racketArgs];
-}
-
 export function withRacket(func: (racketPath: string, racketArgs: string[]) => void, server = false): void {
     const [racket, racketArgs] = getRacket(server);
     if (racket) {
         func(racket, racketArgs);
+    }
+}
+
+export function withRacketShellCmd(func: (racketCmd: string) => void, server = false): void {
+    const racketCmd = getRacketShellCmd(server);
+    if (racketCmd) {
+        func(racketCmd);
     }
 }
