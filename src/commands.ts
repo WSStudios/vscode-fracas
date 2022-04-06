@@ -178,6 +178,22 @@ export async function formatDocument(frcDoc?: vscode.TextDocument, range?: vscod
     if (frcDoc === undefined) {
         frcDoc = vscode.window.activeTextEditor?.document;
     }
+    
+    // VS Code document offsets count CRLF as one character, but the diff lib counts it as two.
+    function lengthWithoutCR(text: string): number {
+        let len = 0;
+        for (let i = 0; i < text.length; i++) {
+            if (text.charAt(i) !== "\r") {
+                len++;
+            }
+        }
+        return len;
+    }
+
+    // // extend range an extra character to include changes appended at the end
+    // if (range) {
+    //     range = new vscode.Range(range.start, range.end.translate(0, 1));
+    // }
 
     // if there is a fracas document, format it
     if (frcDoc !== undefined) {
@@ -194,7 +210,7 @@ export async function formatDocument(frcDoc?: vscode.TextDocument, range?: vscod
             preFormattedText.replace(/\r\n/g, "\n") :
             preFormattedText.replace(/\r\r?\n/g, "\r\n");
 
-        // compute diff
+        // compute diff and convert to vscode edits
         const changes = diffChars(frcDoc.getText(), formattedText);
         const edits: vscode.TextEdit[] = [];
         let offset = 0;
@@ -208,7 +224,10 @@ export async function formatDocument(frcDoc?: vscode.TextDocument, range?: vscod
                         new vscode.Range(position, frcDoc.positionAt(offset + change.value.length))));
                 }
             }
-            offset += change.count || 0;
+
+            if (!change.removed && !change.added) {
+                offset += lengthWithoutCR(change.value);
+            }
         }
 
         return edits;
