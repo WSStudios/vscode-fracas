@@ -209,50 +209,73 @@ export async function regexGroupUriLocation(
  * Convert a diff to a list of vscode.TextEdits
  * https://en.wikipedia.org/wiki/Diff#Unified_format
  * @param diff The diff to convert into TextEdits.
+ * @param range the document range for which to generate edits, or undefined for the entire document.
  * @param eol The line ending to use when converting the diff.
- * @returns 
+ * @returns An array of edits that convert the original into the target.
  */
-export function unifiedDiffToTextEdits(diff: string, eol: vscode.EndOfLine = vscode.EndOfLine.CRLF
+export function unifiedDiffToTextEdits(
+    diff: string,
+    range?: vscode.Range,
+    eol: vscode.EndOfLine = vscode.EndOfLine.CRLF
 ): vscode.TextEdit[] {
     const newline = eol === vscode.EndOfLine.LF ? "\n" : "\r\n";
     const diffLines = diff.split(/\r*\n/g);
     const edits: vscode.TextEdit[] = [];
     let diffIdx = 0;
+
     // scan to the first hunk
     while (!diffLines[diffIdx].startsWith("@@") && diffIdx < diffLines.length) {
-        ++diffIdx;
+        diffIdx += 1;
     }
     // process hunks
     while (diffIdx < diffLines.length) {
         const hunk = /@@\s+-(\d+),(\d+)\s\+(\d+),(\d+)\s+@@/.exec(diffLines[diffIdx]);
         diffIdx += 1;
-
         if (hunk) {
-            const newText: string[] = [];
-
-            // process hunk lines
-            let endCharacter = 0;
-            while (diffIdx < diffLines.length) {
-                const line = diffLines[diffIdx];
-                const op = line.length > 0 ? line[0] : "";
-                if (op === "+" /* addition */) {
-                    newText.push(line.substring(1));
-                } else if (op === " " /* no change */) {
-                    newText.push(line.substring(1));
-                    endCharacter = line.length - 1;
-                } else if (op === "-" /* deletion */) {
-                    endCharacter = line.length - 1;
-                } else if (op === "@" /* new hunk */) {
-                    break;
-                } // else it's a deletion, ignore it
-                ++diffIdx;
-            }
-
-            // convert the hunk text to a TextEdit
             const startLine = parseInt(hunk[1]) - 1;
             const endLine = startLine + parseInt(hunk[2]) - 1;
-            const editRange = new vscode.Range(startLine, 0, endLine, endCharacter);
-            edits.push(new vscode.TextEdit(editRange, newText.join(newline)));
+
+            if (range && (range.start.line > endLine || range.end.line < startLine)) {
+                // skip this hunk if it doesn't apply to the range
+                while (!diffLines[diffIdx].startsWith("@@") && diffIdx < diffLines.length) {
+                    diffIdx += 1;
+                }
+            } else { // process this hunk
+                // process hunk lines
+                const newText: string[] = [];
+                let origLine = startLine;
+                let origEndCharacter = 0;
+                while (diffIdx < diffLines.length) {
+                    const line = diffLines[diffIdx];
+                    const op = line.length > 0 ? line[0] : ""; // first character indicates add or delete
+                    const inRange = range === undefined // lines outside the range are skipped
+                        || (origLine >= range.start.line && origLine <= range.end.line);
+
+                    if (op === "@" /* new hunk */) {
+                        break;
+                    }
+
+                    // accumulate the new text
+                    if (inRange && (op === "+" /* addition */ || op === " " /* no change */)) {
+                        newText.push(line.substring(1));
+                    }
+
+                    // increment indices and compute the end character of the original document line
+                    if (op === " " /* no change */ || op === "-" /* deletion */) {
+                        origLine += 1;
+                        if (inRange) {
+                            origEndCharacter = line.length - 1;
+                        }
+                    }
+                    diffIdx += 1;
+                }
+
+                // convert the hunk text to a TextEdit
+                const editRange = new vscode.Range(
+                    Math.max(startLine, range?.start.line || startLine), 0, 
+                    Math.min(endLine, range?.end.line || endLine), origEndCharacter);
+                edits.push(new vscode.TextEdit(editRange, newText.join(newline)));
+            }
         } else {
             ++diffIdx;
         }

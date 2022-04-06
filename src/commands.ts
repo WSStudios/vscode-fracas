@@ -186,7 +186,7 @@ export async function formatDocument(frcDoc?: vscode.TextDocument, range?: vscod
         console.log(formatCmd);
         const unifiedDiff = await execShell(formatCmd, frcDoc.getText());
         if (unifiedDiff) {
-            return unifiedDiffToTextEdits(unifiedDiff, frcDoc.eol);
+            return unifiedDiffToTextEdits(unifiedDiff, range, frcDoc.eol);
         }
     }
 
