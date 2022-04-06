@@ -1,4 +1,3 @@
-import { diffChars } from "diff";
 import * as path from "path";
 import * as vscode from "vscode";
 import {
@@ -178,55 +177,56 @@ export async function formatDocument(frcDoc?: vscode.TextDocument, range?: vscod
     if (frcDoc === undefined) {
         frcDoc = vscode.window.activeTextEditor?.document;
     }
-    
-    // VS Code document offsets count CRLF as one character, but the diff lib counts it as two.
-    function lengthWithoutCR(text: string): number {
-        let len = 0;
-        for (let i = 0; i < text.length; i++) {
-            if (text.charAt(i) !== "\r") {
-                len++;
-            }
-        }
-        return len;
-    }
-
-    // // extend range an extra character to include changes appended at the end
-    // if (range) {
-    //     range = new vscode.Range(range.start, range.end.translate(0, 1));
-    // }
 
     // if there is a fracas document, format it
     if (frcDoc !== undefined) {
         // Invoke yasi to generate formatted text.
-        const formatCmd = `"${getPython()}" "${getFormatterScript()}" --no-modify "${frcDoc.fileName}"`;
+        const formatCmd = `"${getPython()}" "${getFormatterScript()}" --diff "${frcDoc.fileName}"`;
         console.log(formatCmd);
-        const preFormattedText = await execShell(formatCmd, frcDoc.getText());
-        if (!preFormattedText) {
+        const unifiedDiff = await execShell(formatCmd, frcDoc.getText());
+        if (!unifiedDiff) {
             return [];
         }
+        
+        const newline = frcDoc.eol === vscode.EndOfLine.LF ? "\n" : "\r\n";
 
-        // normalize line endings
-        const formattedText = frcDoc.eol === vscode.EndOfLine.LF ?
-            preFormattedText.replace(/\r\n/g, "\n") :
-            preFormattedText.replace(/\r\r?\n/g, "\r\n");
-
-        // compute diff and convert to vscode edits
-        const changes = diffChars(frcDoc.getText(), formattedText);
+        // Convert the diff to a list of vscode.TextEdits
+        // https://en.wikipedia.org/wiki/Diff#Unified_format
+        const diffLines = unifiedDiff.split(/\r*\n/g);
         const edits: vscode.TextEdit[] = [];
-        let offset = 0;
-        for (const change of changes) {
-            const position = frcDoc.positionAt(offset);
-            if (range === undefined || range.contains(position)) {
-                if (change.added) {
-                    edits.push(vscode.TextEdit.insert(position, change.value));
-                } else if (change.removed) {
-                    edits.push(vscode.TextEdit.delete(
-                        new vscode.Range(position, frcDoc.positionAt(offset + change.value.length))));
-                }
-            }
+        let diffIdx = 0;
+        // scan to the first hunk
+        while (!diffLines[diffIdx].startsWith("@@") && diffIdx < diffLines.length) {
+            ++diffIdx;
+        }
+        // process hunks
+        while (diffIdx < diffLines.length) {
+            const hunk = /@@\s+-(\d+),(\d+)\s\+(\d+),(\d+)\s+@@/.exec(diffLines[diffIdx]);
+            diffIdx += 1;
+            
+            if (hunk) {
+                const newText: string[] = [];
 
-            if (!change.removed && !change.added) {
-                offset += lengthWithoutCR(change.value);
+                // process hunk lines
+                while (diffIdx < diffLines.length) {
+                    const line = diffLines[diffIdx];
+                    const op = line.length > 0 ? line[0] : "";
+                    if (op === "+" /* addition */ || op === " " /* no change */) {
+                        newText.push(line.substring(1));
+                    } else if (op === "@" /* new hunk */) {
+                        break;
+                    } // else it's a deletion, ignore it
+                    ++diffIdx;
+                }
+
+                // convert the hunk text to a TextEdit
+                const startLine = parseInt(hunk[1]) - 1;
+                const endLine = startLine + parseInt(hunk[2]) - 1;
+                const editRange = new vscode.Range(
+                    startLine, 0, endLine, frcDoc.lineAt(endLine).range.end.character);
+                edits.push(new vscode.TextEdit(editRange, newText.join(newline)));
+            } else {
+                ++diffIdx;
             }
         }
 
