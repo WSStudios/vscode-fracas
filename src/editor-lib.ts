@@ -92,7 +92,7 @@ export function resolveSymbol(
     document = document || activeEditor?.document;
     where = where || activeEditor?.selection; // use the given value or the active editor selection
     let range: vscode.Range | undefined = where ? resolveRange(where) : undefined;
-    
+
     if (document && range) {
         // default to the word under the cursor if no range is provided
         if (range?.isEmpty) {
@@ -119,8 +119,8 @@ export function resolveSymbol(
  * @param searchRx The regular expression to search for
  * @returns The position of the first match, or undefined if no match was found.
  */
-export async function searchForward(uri: vscode.Uri, pos: vscode.Position, searchRx: RegExp)
-    : Promise<{line: vscode.TextLine, match: RegExpExecArray} | undefined> {
+export async function searchForward(uri: vscode.Uri, pos: vscode.Position, searchRx: RegExp
+): Promise<{ line: vscode.TextLine, match: RegExpExecArray } | undefined> {
     const doc = await vscode.workspace.openTextDocument(uri);
     let lineNo = pos.line;
     let line = doc.lineAt(lineNo);
@@ -128,7 +128,7 @@ export async function searchForward(uri: vscode.Uri, pos: vscode.Position, searc
     while (lineNo < doc.lineCount) {
         const match = searchRx.exec(lineText);
         if (match) {
-            return {line, match};
+            return { line, match };
         }
 
         line = doc.lineAt(lineNo);
@@ -146,8 +146,8 @@ export async function searchForward(uri: vscode.Uri, pos: vscode.Position, searc
  * @param searchRx The regular expression to search for
  * @returns The position of the first match preceding pos, or undefined if no match was found.
  */
-export async function searchBackward(uri: vscode.Uri, pos: vscode.Position, searchRx: RegExp)
-    : Promise<{line: vscode.TextLine, match: RegExpExecArray} | undefined> {
+export async function searchBackward(uri: vscode.Uri, pos: vscode.Position, searchRx: RegExp
+): Promise<{ line: vscode.TextLine, match: RegExpExecArray } | undefined> {
     const doc = await vscode.workspace.openTextDocument(uri);
     let lineNo = pos.line;
     let line = doc.lineAt(lineNo);
@@ -155,7 +155,7 @@ export async function searchBackward(uri: vscode.Uri, pos: vscode.Position, sear
     while (lineNo >= 0) {
         const match = _lastMatch(searchRx, lineText);
         if (match) {
-            return {line, match};
+            return { line, match };
         }
 
         line = doc.lineAt(lineNo);
@@ -203,6 +203,62 @@ export async function regexGroupUriLocation(
 ): Promise<vscode.Location> {
     const document = await vscode.workspace.openTextDocument(uri);
     return regexGroupDocumentLocation(document, match, matchPosition, group);
+}
+
+/**
+ * Convert a diff to a list of vscode.TextEdits
+ * https://en.wikipedia.org/wiki/Diff#Unified_format
+ * @param diff The diff to convert into TextEdits.
+ * @param eol The line ending to use when converting the diff.
+ * @returns 
+ */
+export function unifiedDiffToTextEdits(diff: string, eol: vscode.EndOfLine = vscode.EndOfLine.CRLF
+): vscode.TextEdit[] {
+    const newline = eol === vscode.EndOfLine.LF ? "\n" : "\r\n";
+    const diffLines = diff.split(/\r*\n/g);
+    const edits: vscode.TextEdit[] = [];
+    let diffIdx = 0;
+    // scan to the first hunk
+    while (!diffLines[diffIdx].startsWith("@@") && diffIdx < diffLines.length) {
+        ++diffIdx;
+    }
+    // process hunks
+    while (diffIdx < diffLines.length) {
+        const hunk = /@@\s+-(\d+),(\d+)\s\+(\d+),(\d+)\s+@@/.exec(diffLines[diffIdx]);
+        diffIdx += 1;
+
+        if (hunk) {
+            const newText: string[] = [];
+
+            // process hunk lines
+            let endCharacter = 0;
+            while (diffIdx < diffLines.length) {
+                const line = diffLines[diffIdx];
+                const op = line.length > 0 ? line[0] : "";
+                if (op === "+" /* addition */) {
+                    newText.push(line.substring(1));
+                } else if (op === " " /* no change */) {
+                    newText.push(line.substring(1));
+                    endCharacter = line.length - 1;
+                } else if (op === "-" /* deletion */) {
+                    endCharacter = line.length - 1;
+                } else if (op === "@" /* new hunk */) {
+                    break;
+                } // else it's a deletion, ignore it
+                ++diffIdx;
+            }
+
+            // convert the hunk text to a TextEdit
+            const startLine = parseInt(hunk[1]) - 1;
+            const endLine = startLine + parseInt(hunk[2]) - 1;
+            const editRange = new vscode.Range(startLine, 0, endLine, endCharacter);
+            edits.push(new vscode.TextEdit(editRange, newText.join(newline)));
+        } else {
+            ++diffIdx;
+        }
+    }
+
+    return edits;
 }
 
 /**

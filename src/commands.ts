@@ -8,7 +8,7 @@ import {
     getRacketShellCmd
 } from "./config";
 import { getOrDefault } from "./containers";
-import { getSelectedSymbol, withFilePath } from "./editor-lib";
+import { getSelectedSymbol, unifiedDiffToTextEdits, withFilePath } from "./editor-lib";
 import {
     createTerminal,
     runFileInTerminal,
@@ -188,49 +188,7 @@ export async function formatDocument(frcDoc?: vscode.TextDocument, range?: vscod
             return [];
         }
         
-        const newline = frcDoc.eol === vscode.EndOfLine.LF ? "\n" : "\r\n";
-
-        // Convert the diff to a list of vscode.TextEdits
-        // https://en.wikipedia.org/wiki/Diff#Unified_format
-        const diffLines = unifiedDiff.split(/\r*\n/g);
-        const edits: vscode.TextEdit[] = [];
-        let diffIdx = 0;
-        // scan to the first hunk
-        while (!diffLines[diffIdx].startsWith("@@") && diffIdx < diffLines.length) {
-            ++diffIdx;
-        }
-        // process hunks
-        while (diffIdx < diffLines.length) {
-            const hunk = /@@\s+-(\d+),(\d+)\s\+(\d+),(\d+)\s+@@/.exec(diffLines[diffIdx]);
-            diffIdx += 1;
-            
-            if (hunk) {
-                const newText: string[] = [];
-
-                // process hunk lines
-                while (diffIdx < diffLines.length) {
-                    const line = diffLines[diffIdx];
-                    const op = line.length > 0 ? line[0] : "";
-                    if (op === "+" /* addition */ || op === " " /* no change */) {
-                        newText.push(line.substring(1));
-                    } else if (op === "@" /* new hunk */) {
-                        break;
-                    } // else it's a deletion, ignore it
-                    ++diffIdx;
-                }
-
-                // convert the hunk text to a TextEdit
-                const startLine = parseInt(hunk[1]) - 1;
-                const endLine = startLine + parseInt(hunk[2]) - 1;
-                const editRange = new vscode.Range(
-                    startLine, 0, endLine, frcDoc.lineAt(endLine).range.end.character);
-                edits.push(new vscode.TextEdit(editRange, newText.join(newline)));
-            } else {
-                ++diffIdx;
-            }
-        }
-
-        return edits;
+        return unifiedDiffToTextEdits(unifiedDiff, frcDoc.eol);
     }
 
     return [];
