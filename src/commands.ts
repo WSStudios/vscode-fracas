@@ -181,14 +181,13 @@ export async function formatDocument(frcDoc?: vscode.TextDocument, range?: vscod
     // if there is a fracas document, format it
     if (frcDoc !== undefined) {
         // Invoke yasi to generate formatted text.
-        const formatCmd = `"${getPython()}" "${getFormatterScript()}" --diff "${frcDoc.fileName}"`;
+        const indent = vscode.workspace.getConfiguration("vscode-fracas.formatting").get<number>("indentSize", 2);
+        const formatCmd = `"${getPython()}" "${getFormatterScript()}" --diff --indent-size ${indent} "${frcDoc.fileName}"`;
         console.log(formatCmd);
         const unifiedDiff = await execShell(formatCmd, frcDoc.getText());
-        if (!unifiedDiff) {
-            return [];
+        if (unifiedDiff) {
+            return unifiedDiffToTextEdits(unifiedDiff, frcDoc.eol);
         }
-        
-        return unifiedDiffToTextEdits(unifiedDiff, frcDoc.eol);
     }
 
     return [];

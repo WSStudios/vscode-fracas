@@ -125,19 +125,19 @@
                         ".",
                         "..\\fracas\\lib"
                     ],
-                    "markdownDescription": "Paths to search for Racket collections. Relative to #vscode-fracas.general.projectWorkspaceFolder#",
-                    "order": 3
+                    "markdownDescription": "Paths to search for Racket collections. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
+                    "order": 1
                 },
-                "vscode-fracas.general.pythonPath": {
-                    "type": "string",
-                    "default": "C:\\Progra~1\\Epic Games\\UE_4.26\\Engine\\Binaries\\ThirdParty\\Python3\\Win64\\python.exe",
-                    "markdownDescription": "Path to the `ninja` executable used to precompile racket files.",
-                    "order": 4
+                "vscode-fracas.formatting.indentSize": {
+                    "type": "number",
+                    "default": 2,
+                    "markdownDescription": "The number of spaces per indent.",
+                    "order": 3
                 },
                 "vscode-fracas.localization.stringTableRegistryFile": {
                     "type": "string",
                     "default": "..\\tdp1.unreal\\Source\\Data\\TdpLocalization.cpp",
-                    "markdownDescription": "Path to the generated C++ source file that registers localized text tables with the UE4 project. Relative to #vscode-fracas.general.projectWorkspaceFolder#",
+                    "markdownDescription": "Path to the generated C++ source file that registers localized text tables with the UE4 project. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
                     "order": 5
                 },
                 "vscode-fracas.localization.stringTableSourcePaths": {
@@ -149,13 +149,13 @@
                         "fracas\\localization-defines.frc",
                         "fracas\\text\\localized-text*.frc"
                     ],
-                    "markdownDescription": "Glob patterns of fracas source files containing localized text. Used to generated the *String Table Registry File*. Relative to #vscode-fracas.general.projectWorkspaceFolder#",
+                    "markdownDescription": "Glob patterns of fracas source files containing localized text. Used to generated the *String Table Registry File*. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
                     "order": 6
                 },
                 "vscode-fracas.localization.stringTableDestDir": {
                     "type": "string",
                     "default": "..\\tdp1.unreal\\Content\\GameData\\Localization\\",
-                    "markdownDescription": "Directory with generated CSV files containing localized text tables. Relative to #vscode-fracas.general.projectWorkspaceFolder#",
+                    "markdownDescription": "Directory with generated CSV files containing localized text tables. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
                     "order": 7
                 },
                 "vscode-fracas.trace.server": {
