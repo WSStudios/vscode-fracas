@@ -51,6 +51,18 @@ export async function loadProjectConfig(): Promise<void> {
     }
 }
 
+let cfgWatcher: vscode.FileSystemWatcher;
+export function watchProjectConfig(): void {
+    if (!cfgWatcher) {
+        const cfgPattern = new vscode.RelativePattern(getProjectFolder(), 
+            `cfg/{${process.env.USERNAME}.cfg,ws.cfg}`);
+        cfgWatcher = vscode.workspace.createFileSystemWatcher(cfgPattern);
+        cfgWatcher.onDidCreate(loadProjectConfig);
+        cfgWatcher.onDidChange(loadProjectConfig);
+        cfgWatcher.onDidDelete(loadProjectConfig);
+    }
+}
+
 export function getProjectConfig(sectionName: string, key: string): unknown {
     // find the first matching key in the config files
     for (const cfg of kCfgFiles) {

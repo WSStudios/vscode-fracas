@@ -5,7 +5,8 @@ import * as com from "./commands";
 import * as ue4 from "./ue4";
 import {
     loadProjectConfig,
-    setFormatterScript
+    setFormatterScript,
+    watchProjectConfig
 } from "./config";
 import { withRacket } from "./utils";
 import { FracasCompletionItemProvider } from './fracas/completion-item-provider';
@@ -26,6 +27,7 @@ export function deactivate(): Promise<void> {
 }
 
 function setupLSP() {
+    
     withRacket((racket: string, racketArgs: string[]) => {
         const executable = {
             command: racket,
@@ -76,6 +78,8 @@ async function configurationChanged() {
         .getConfiguration("vscode-fracas.lsp")
         .get("enabled", true);
 
+    await loadProjectConfig(); // must load before setting up LSP so that racket path is available
+
     if (!langClient) {
         setupLSP();
     }
@@ -87,20 +91,14 @@ async function configurationChanged() {
             langClient.stop();
         }
     }
-
-    await loadProjectConfig();
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-    const loadConfigTask = loadProjectConfig();
-
     // Each file has one output terminal and one repl
     // Those two are saved in terminals and repls, respectively
     // The file is _ran_ in the terminal and _loaded_ into a repl
     const terminals: Map<string, vscode.Terminal> = new Map();
     const repls: Map<string, vscode.Terminal> = new Map();
-
-    vscode.workspace.onDidChangeConfiguration(configurationChanged);
 
     // precompile fracas every time a file is saved
     function _maybeUpdateStringTables(uris: readonly vscode.Uri[]): void {
@@ -158,10 +156,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(vscode.languages.registerDocumentRangeFormattingEditProvider(
         fracasDocumentFilter, fracasFormatter));
 
-    await loadConfigTask; // wait for config files to fully load before exiting activation.
-
+    // Setup project config
     // save the location of yasi for use in document formatting.
     setFormatterScript(context.asAbsolutePath("resources/python/yasi_ws.py"));
-    // maybe start language server. must be called after loading config so that racket.exe is resolved
-    await configurationChanged();
+    await configurationChanged(); // Start language server.
+    watchProjectConfig(); // watch for wonderstorm .cfg file changes
+    vscode.workspace.onDidChangeConfiguration(configurationChanged); // watch VS code config changes
+    
 }
