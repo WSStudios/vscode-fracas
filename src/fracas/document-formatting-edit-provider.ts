@@ -2,15 +2,17 @@
 import * as vscode from 'vscode';
 import { formatFracasDocument } from '../commands';
 
-export class FracasDocumentFormattingEditProvider
-    implements vscode.DocumentFormattingEditProvider, vscode.DocumentRangeFormattingEditProvider {
+export class FracasDocumentFormattingEditProvider implements
+    vscode.DocumentFormattingEditProvider,
+    vscode.DocumentRangeFormattingEditProvider,
+    vscode.OnTypeFormattingEditProvider {
 
     provideDocumentFormattingEdits(
         document: vscode.TextDocument,
         options: vscode.FormattingOptions,
         token: vscode.CancellationToken
     ): vscode.ProviderResult<vscode.TextEdit[]> {
-        return formatFracasDocument(document);
+        return formatFracasDocument(document, options);
     }
 
     provideDocumentRangeFormattingEdits(
@@ -19,6 +21,16 @@ export class FracasDocumentFormattingEditProvider
         options: vscode.FormattingOptions,
         token: vscode.CancellationToken
     ): vscode.ProviderResult<vscode.TextEdit[]> {
-        return formatFracasDocument(document, range);
+        return formatFracasDocument(document, options, range);
+    }
+
+    provideOnTypeFormattingEdits(
+        document: vscode.TextDocument, 
+        position: vscode.Position, 
+        ch: string, 
+        options: vscode.FormattingOptions, 
+        token: vscode.CancellationToken
+    ): vscode.ProviderResult<vscode.TextEdit[]> {
+        throw new Error('Method not implemented.');
     }
 }

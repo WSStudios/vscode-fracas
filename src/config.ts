@@ -17,7 +17,7 @@ const kOsBinExt = kOsType === 'Windows_NT' ? '.exe' : '';
 export function getProjectFolder(): vscode.WorkspaceFolder {
     const projectDir = vscode.workspace
         .getConfiguration("vscode-fracas.general")
-        .get<string>("projectWorkspaceFolder") || ".";
+        .get<string>("projectWorkspaceFolder") ?? ".";
     const folder = vscode.workspace.workspaceFolders?.find(folder => folder.name === projectDir);
     if (!folder) {
         throw vscode.FileSystemError.FileNotFound(`Project folder ${projectDir} not found.`);
@@ -35,7 +35,7 @@ export async function loadProjectConfig(): Promise<void> {
     // parse username.cfg and ws.cfg ini files
     // const cfgPaths = vscode.workspace
     //     .getConfiguration("vscode-fracas.general")
-    //     .get<string[]>("projectConfiguration") || [];
+    //     .get<string[]>("projectConfiguration") ?? [];
     const cfgPaths = [["cfg", `${process.env.USERNAME}.cfg`], ["cfg", "ws.cfg"]];
     const projectFolder = getProjectFolder();
     kCfgFiles.length = 0; // clear previous configs
@@ -88,7 +88,7 @@ export function getRacket(server = false): [string, string[]] {
     const racketPath = path.normalize(path.join(racketDir, `racket${kOsBinExt}`));
     const collectPaths = vscode.workspace
         .getConfiguration("vscode-fracas.general")
-        .get<string[]>("racketCollectionPaths") || [];
+        .get<string[]>("racketCollectionPaths") ?? [];
     const racketArgs = [];
     for (const collectPath of collectPaths) {
         racketArgs.push("-S", path.resolve(projectDir, collectPath));

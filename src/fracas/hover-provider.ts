@@ -26,7 +26,7 @@ export class FracasHoverProvider implements vscode.HoverProvider {
         const positionAsRange = new vscode.Range(position, position);
         if (comments.length > 0) {
             const resolvedSymbol = resolveSymbol(document, position);
-            return new vscode.Hover(comments, resolvedSymbol?.range || positionAsRange);
+            return new vscode.Hover(comments, resolvedSymbol?.range ?? positionAsRange);
         } else {
             return new vscode.Hover("No code comments found.", positionAsRange);;
         }

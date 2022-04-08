@@ -87,14 +87,14 @@ export async function makeStringTableImport(): Promise<void> {
     const stringTableCpp = vscode.workspace
         .getConfiguration("vscode-fracas.general")
         .get<string>("stringTableRegistryFile")
-        || "..\\tdp1.unreal\\Source\\Data\\Private\\TdpLocalization.cpp";
+        ?? "..\\tdp1.unreal\\Source\\Data\\Private\\TdpLocalization.cpp";
     const projectDir = getProjectDir();
     const stringTableDestDir = vscode.workspace
         .getConfiguration("vscode-fracas.localization")
-        .get<string>("stringTableDestDir") || ".";
+        .get<string>("stringTableDestDir") ?? ".";
     const stringTableSourcePaths = vscode.workspace
         .getConfiguration("vscode-fracas.localization")
-        .get<string[]>("stringTableSourcePaths") || [];
+        .get<string[]>("stringTableSourcePaths") ?? [];
 
     if (racket) {
         const textFrcFiles = [];
@@ -126,7 +126,7 @@ export async function compileFracasObject(filePath: string, fracasObject: string
 let lastFracasObject = "";
 let lastFracasFile = "";
 export function compileSelectedFracasObject(): void {
-    lastFracasFile = vscode.window.activeTextEditor?.document?.fileName || "";
+    lastFracasFile = vscode.window.activeTextEditor?.document?.fileName ?? "";
     lastFracasObject = getSelectedSymbol();
     compileFracasObject(lastFracasFile, lastFracasObject);
 }
@@ -176,8 +176,11 @@ export function showOutput(terminals: Map<string, vscode.Terminal>): void {
     });
 }
 
-export async function formatFracasDocument(frcDoc?: vscode.TextDocument, range?: vscode.Range)
-    : Promise<vscode.TextEdit[]> {
+export async function formatFracasDocument(
+    frcDoc?: vscode.TextDocument, 
+    options?: vscode.FormattingOptions,
+    range?: vscode.Range
+): Promise<vscode.TextEdit[]> {
     // use the open document if none is provided
     if (frcDoc === undefined) {
         frcDoc = vscode.window.activeTextEditor?.document;
@@ -191,7 +194,7 @@ export async function formatFracasDocument(frcDoc?: vscode.TextDocument, range?:
         }
 
         // Invoke yasi to generate formatted text.
-        const indent = vscode.workspace.getConfiguration("vscode-fracas.formatting").get<number>("indentSize", 2);
+        const indent = options?.tabSize ?? 2;
         const formatCmd = `"${getPython()}" "${getFormatterScript()}" --diff --indent-size ${indent}`;
         console.log(formatCmd);
         const diff = await execShell(formatCmd, frcDoc.getText(range) + "\n");

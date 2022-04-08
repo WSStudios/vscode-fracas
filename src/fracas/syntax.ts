@@ -641,8 +641,8 @@ export async function findKeywordDefinition(
     searchKind: SearchKind = SearchKind.wholeMatch
 ): Promise<FracasDefinition[]> {
     const activeEditor = vscode.window.activeTextEditor;
-    referencingDocument = referencingDocument || activeEditor?.document;
-    documentSelection = documentSelection || activeEditor?.selection;
+    referencingDocument = referencingDocument ?? activeEditor?.document;
+    documentSelection = documentSelection ?? activeEditor?.selection;
     if (!referencingDocument || !documentSelection) {
         return [];
     }
@@ -680,8 +680,8 @@ export async function findEnumOrMaskMembers(
     searchKind: SearchKind = SearchKind.wholeMatch
 ): Promise<FracasDefinition[]> {
     const activeEditor = vscode.window.activeTextEditor;
-    referencingDocument = referencingDocument || activeEditor?.document;
-    documentPosition = documentPosition || activeEditor?.selection?.active;
+    referencingDocument = referencingDocument ?? activeEditor?.document;
+    documentPosition = documentPosition ?? activeEditor?.selection?.active;
     if (!referencingDocument || !documentPosition) {
         return [];
     }
@@ -761,8 +761,8 @@ export async function findReferences(
     token?: vscode.CancellationToken
 ): Promise<vscode.Location[]> {
     const activeEditor = vscode.window.activeTextEditor;
-    referencingDocument = referencingDocument || activeEditor?.document;
-    referencingPosition = referencingPosition || activeEditor?.selection.anchor;
+    referencingDocument = referencingDocument ?? activeEditor?.document;
+    referencingPosition = referencingPosition ?? activeEditor?.selection.anchor;
     if (!referencingDocument || !referencingPosition) {
         return [];
     }
@@ -795,11 +795,11 @@ export async function findDocumentSymbols(
     const textMatches = await findTextInFiles(defineRxStr, token, uri.fsPath);
     const symbols = textMatches.map(searchMatch => {
         const rxMatch = defineRx.exec(searchMatch.preview.text);
-        const [_, defToken, typeName] = rxMatch || [undefined, undefined, searchMatch.preview.text];
+        const [_, defToken, typeName] = rxMatch ?? [undefined, undefined, searchMatch.preview.text];
         const symbol = new vscode.DocumentSymbol(
-            typeName || 'unknown',
+            typeName ?? 'unknown',
             searchMatch.preview.text,
-            symbolKind(definitionKind(defToken || 'define')),
+            symbolKind(definitionKind(defToken ?? 'define')),
             getRange(searchMatch.ranges),
             getRange(searchMatch.ranges)
         );
@@ -935,7 +935,7 @@ export async function findMembers(
             members.push(...enumMembers);
         }
     } else { // for types other than enums and masks, use the regexp to find members
-        const fieldRx = _memberDeclRx(fracasDef.kind, memberName || '', searchKind);
+        const fieldRx = _memberDeclRx(fracasDef.kind, memberName ?? '', searchKind);
         for (const range of ranges) {
             // search at this scope for members
             const expr = document.getText(range);

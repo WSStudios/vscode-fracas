@@ -6,7 +6,7 @@ import stream = require("stream");
 export function execShell(cmd: string, input?: string, workingDir?: string) : Promise<string> {
     return new Promise<string>((resolve, reject) => {
         const child = cp.exec(cmd, 
-            { cwd: workingDir || getProjectDir() },
+            { cwd: workingDir ?? getProjectDir() },
             (err, out) => {
                 if (err) {
                     vscode.window.showErrorMessage(err.message);

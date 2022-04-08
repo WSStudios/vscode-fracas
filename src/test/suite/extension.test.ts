@@ -21,7 +21,7 @@ async function showFracasDocument(
     return { document, editor };
 }
 
-const testFixtureDir = (vscode.workspace.workspaceFolders || [])[0].uri.fsPath;
+const testFixtureDir = (vscode.workspace.workspaceFolders ?? [])[0].uri.fsPath;
 const rewardFrc = path.join(testFixtureDir, 'reward.frc');
 const factionsFrc = path.join(testFixtureDir, 'factions.frc');
 const collisionDefinesFrc = path.join(testFixtureDir, 'collision-defines.frc');

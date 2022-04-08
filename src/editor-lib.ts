@@ -89,15 +89,15 @@ export function resolveSymbol(
 ): { document: vscode.TextDocument, range: vscode.Range } | undefined {
     // default to current editor selection if no document or range is provided
     const activeEditor = vscode.window.activeTextEditor;
-    document = document || activeEditor?.document;
-    where = where || activeEditor?.selection; // use the given value or the active editor selection
+    document = document ?? activeEditor?.document;
+    where = where ?? activeEditor?.selection; // use the given value or the active editor selection
     let range: vscode.Range | undefined = where ? resolveRange(where) : undefined;
 
     if (document && range) {
         // default to the word under the cursor if no range is provided
         if (range?.isEmpty) {
             const wordRange = document.getWordRangeAtPosition(
-                range?.start || where as vscode.Position, /[#:\w\-+*.>]+/);
+                range?.start ?? where as vscode.Position, /[#:\w\-+*.>]+/);
             if (wordRange) {
                 range = wordRange;
             }
@@ -276,5 +276,5 @@ function _lastMatch(searchRx: RegExp, text: string): RegExpExecArray | null {
             match = searchRx.exec(text);
         }
     }
-    return match || prevMatch;
+    return match ?? prevMatch;
 }
