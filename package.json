@@ -128,12 +128,6 @@
                     "markdownDescription": "Paths to search for Racket collections. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
                     "order": 1
                 },
-                "vscode-fracas.formatting.indentSize": {
-                    "type": "number",
-                    "default": 2,
-                    "markdownDescription": "The number of spaces per indent.",
-                    "order": 3
-                },
                 "vscode-fracas.localization.stringTableRegistryFile": {
                     "type": "string",
                     "default": "..\\tdp1.unreal\\Source\\Data\\TdpLocalization.cpp",
