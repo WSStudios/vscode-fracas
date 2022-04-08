@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import * as vscode from 'vscode';
-import { formatDocument } from '../commands';
+import { formatFracasDocument } from '../commands';
 
 export class FracasDocumentFormattingEditProvider
     implements vscode.DocumentFormattingEditProvider, vscode.DocumentRangeFormattingEditProvider {
@@ -10,7 +10,7 @@ export class FracasDocumentFormattingEditProvider
         options: vscode.FormattingOptions,
         token: vscode.CancellationToken
     ): vscode.ProviderResult<vscode.TextEdit[]> {
-        return formatDocument(document);
+        return formatFracasDocument(document);
     }
 
     provideDocumentRangeFormattingEdits(
@@ -19,6 +19,6 @@ export class FracasDocumentFormattingEditProvider
         options: vscode.FormattingOptions,
         token: vscode.CancellationToken
     ): vscode.ProviderResult<vscode.TextEdit[]> {
-        return formatDocument(document, range);
+        return formatFracasDocument(document, range);
     }
 }

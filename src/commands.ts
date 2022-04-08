@@ -3,12 +3,17 @@ import * as vscode from "vscode";
 import {
     getFormatterScript,
     getNinja,
-    getProjectDir, 
-    getPython, 
+    getProjectDir,
+    getPython,
     getRacketShellCmd
 } from "./config";
 import { getOrDefault } from "./containers";
-import { getSelectedSymbol, unifiedDiffToTextEdits, withFilePath } from "./editor-lib";
+import {
+    getSelectedSymbol,
+    diffToTextEdits,
+    withFilePath
+} from "./editor-lib";
+import { findEnclosingExpression } from "./fracas/syntax";
 import {
     createTerminal,
     runFileInTerminal,
@@ -171,8 +176,8 @@ export function showOutput(terminals: Map<string, vscode.Terminal>): void {
     });
 }
 
-export async function formatDocument(frcDoc?: vscode.TextDocument, range?: vscode.Range)
-: Promise<vscode.TextEdit[]> {
+export async function formatFracasDocument(frcDoc?: vscode.TextDocument, range?: vscode.Range)
+    : Promise<vscode.TextEdit[]> {
     // use the open document if none is provided
     if (frcDoc === undefined) {
         frcDoc = vscode.window.activeTextEditor?.document;
@@ -180,15 +185,47 @@ export async function formatDocument(frcDoc?: vscode.TextDocument, range?: vscod
 
     // if there is a fracas document, format it
     if (frcDoc !== undefined) {
+        // Expand selection range to a valid expression
+        if (range) {
+            range = findEnclosingExpression(frcDoc, range);
+        }
+
         // Invoke yasi to generate formatted text.
         const indent = vscode.workspace.getConfiguration("vscode-fracas.formatting").get<number>("indentSize", 2);
-        const formatCmd = `"${getPython()}" "${getFormatterScript()}" --diff --indent-size ${indent} "${frcDoc.fileName}"`;
+        const formatCmd = `"${getPython()}" "${getFormatterScript()}" --diff --indent-size ${indent}`;
         console.log(formatCmd);
-        const unifiedDiff = await execShell(formatCmd, frcDoc.getText());
-        if (unifiedDiff) {
-            return unifiedDiffToTextEdits(unifiedDiff, range, frcDoc.eol);
+        const diff = await execShell(formatCmd, frcDoc.getText(range) + "\n");
+
+        // convert diff to text edits and move them to the correct position
+        if (diff) {
+            const newline = frcDoc.eol === vscode.EndOfLine.LF ? "\n" : "\r\n";
+            const edits = diffToTextEdits(diff, newline);
+            if (range) {
+                _translateEditsBy(edits, range.start, newline);
+            }
+            return edits;
         }
     }
 
     return [];
+}
+
+function _translateEditsBy(edits: vscode.TextEdit[], offset: vscode.Position, newline = "\r\n"
+): void {
+    // offset the edits by the offset
+    const exprIndent = " ".repeat(offset.character);
+    for (const edit of edits) {
+        // Offset the text edits to the position of the selected expression
+        edit.range = new vscode.Range(
+            edit.range.start.translate(offset.line, offset.character),
+            edit.range.end.translate(offset.line, offset.character));
+        // Indent the text edit lines to match the selected expression
+        if (exprIndent.length > 0) {
+            edit.newText = edit.newText
+                .split(newline)
+                .map(line => exprIndent + line) // prepend the indent to each line
+                .join(newline)
+                .substring(exprIndent.length); // drop indent from first line, which is already indented.
+        }
+    }
 }

@@ -212,9 +212,8 @@ export async function regexGroupUriLocation(
  * @param eol The line ending to use when converting the diff.
  * @returns 
  */
-export function unifiedDiffToTextEdits(diff: string, eol: vscode.EndOfLine = vscode.EndOfLine.CRLF
+export function diffToTextEdits(diff: string, newline = "\r\n"
 ): vscode.TextEdit[] {
-    const newline = eol === vscode.EndOfLine.LF ? "\n" : "\r\n";
     const diffLines = diff.split(/\r*\n/g);
     const edits: vscode.TextEdit[] = [];
     let diffIdx = 0;
