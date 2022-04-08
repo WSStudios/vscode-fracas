@@ -6,6 +6,7 @@ import {
     getSelectedSymbol, 
     regexGroupDocumentLocation, 
     regexGroupUriLocation, 
+    resolveRange, 
     resolveSymbol, 
     searchBackward 
 } from '../editor-lib';
@@ -362,24 +363,56 @@ export async function findComment(uri: vscode.Uri, position: vscode.Position): P
 
 export function findOpenBracket(
     document: vscode.TextDocument,
-    pos: vscode.Position,
+    pos: vscode.Position | vscode.Range,
     includeBrackets = true
 ): vscode.Position {
-    // first rewind to opening bracket
+    // compute initial nesting based on how many expression borders overlap the range.
+    const range = resolveRange(pos);
     let nesting = 0;
-    for (let lineNo = pos.line; lineNo >= 0; --lineNo) {
+    let minNesting = 0;
+    for (let lineNo = range.start.line; lineNo <= range.end.line; ++lineNo) {
+        const line = document.lineAt(lineNo);
+        for (
+            // First time through outer loop, initialize charNo to start of `range`. Thereafter use 0, the start of the line.
+            let charNo = (lineNo === range.start.line ? range.start.character : 0); 
+            charNo < (lineNo === range.end.line ? range.end.character : line.range.end.character); 
+            ++charNo
+        ) {
+            const c = line.text[charNo];
+            if (c === ';') {
+                break; // skip comment
+            } else if (c === '(' || c === '[' || c === '{') {
+                nesting += 1;
+            } else if (c === ')' || c === ']' || c === '}') {
+                nesting -= 1;
+                if (nesting < minNesting) {
+                    minNesting = nesting;
+                }
+            }
+        }
+    }
+    
+    // rewind to opening bracket
+    nesting = 0;
+    for (let lineNo = range.start.line; lineNo >= 0; --lineNo) {
         const line = document.lineAt(lineNo);
 
         // pre-strip comments as we'll be scanning the string from end to start
         const nonCommentMatch = /([^;])*/.exec(line.text);
         const textBeforeComment = nonCommentMatch ? nonCommentMatch[0] : line.text;
 
-        // scan backward from end of line to find opening bracket
-        for (let charNo = (lineNo === pos.line ? pos.character : line.range.end.character); charNo >= line.range.start.character; --charNo) {
+        // scan backward from the start of the selection range to find the opening bracket
+        for (
+            // First time through outer loop, initialize charNo to selection `range` start. Thereafter use the end of the line.
+            let charNo = (lineNo === range.start.line ? range.start.character : line.range.end.character); 
+            charNo >= line.range.start.character; 
+            --charNo
+        ) {
             const c = textBeforeComment[charNo];
             if (c === '(' || c === '[' || c === '{') {
-                nesting += 1;
-                if (nesting >= 1) {
+                nesting -= 1; // decrement nesting when moving backward outside a bracket pair
+                // if we've found an opening bracket nested outside the range start, then we're done
+                if (nesting < minNesting) {
                     const openParen = new vscode.Position(lineNo, charNo);
                     if (includeBrackets) {
                         return openParen;
@@ -388,16 +421,16 @@ export function findOpenBracket(
                     }
                 }
             } else if (c === ')' || c === ']' || c === '}') {
-                nesting -= 1;
+                nesting += 1;
             }
         }
     }
     return new vscode.Position(0, 0);
 }
 
-export function findBracketPair(
+export function findEnclosingExpression(
     document: vscode.TextDocument,
-    pos: vscode.Position,
+    pos: vscode.Position | vscode.Range,
     includeBrackets = true
 ): vscode.Range {
     // first rewind to opening bracket
@@ -416,16 +449,18 @@ export function findBracketPair(
             } else if (c === ')' || c === ']' || c === '}') {
                 nesting -= 1;
                 if (nesting <= 0) {
-                    let closeParen = new vscode.Position(lineNo, charNo);
+                    let closeParen = new vscode.Position(lineNo, charNo + 1);
                     if (!includeBrackets) {
                         closeParen = document.positionAt(document.offsetAt(closeParen) - 1);
                     }
+                    return new vscode.Range(openParen, closeParen);
                 }
             }
         }
     }
     return new vscode.Range(openParen, new vscode.Position(document.lineCount - 1, document.lineAt(document.lineCount - 1).range.end.character));
 }
+
 
 function _rangesAtScope(
     document: vscode.TextDocument,
