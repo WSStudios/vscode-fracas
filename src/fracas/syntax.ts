@@ -376,32 +376,40 @@ export function findOpenBracket(
 ): vscode.Position | undefined {
     // compute initial nesting based on how many expression borders overlap the range.
     // e.g. if the selection within ( (hi)(ho) ) covers [i)(h] then the initial nesting at 'i' is -1
-    const range = resolveRange(pos);
+    let range = resolveRange(pos);
     // const firstChar = document.getText(new vscode.Range(range.start, range.start.translate(0, 1)));
     // const lastChar = document.getText(new vscode.Range(range.end, range.end.translate(0, -1)));
     let nesting = 0; 
     let minNesting = 0; // isCloseBracket(lastChar) && !isOpenBracket(firstChar) ? -1 : 0; // nudge nesting inside the expression
     
-    for (let lineNo = range.start.line; lineNo <= range.end.line; ++lineNo) {
-        const line = document.lineAt(lineNo);
-        for (
-            // First time through outer loop, initialize charNo to start of `range`. Thereafter use 0, the start of the line.
-            let charNo = (lineNo === range.start.line ? range.start.character : 0); 
-            charNo < (lineNo === range.end.line ? range.end.character : line.range.end.character); 
-            ++charNo
-        ) {
-            const c = line.text[charNo];
-            if (c === ';') {
-                break; // skip comment
-            } else if (isOpenBracket(c)) {
-                nesting += 1;
-            } else if (isCloseBracket(c)) {
-                nesting -= 1;
-                if (nesting < minNesting) {
-                    minNesting = nesting;
+    if (!range.isEmpty) {
+        for (let lineNo = range.start.line; lineNo <= range.end.line; ++lineNo) {
+            const line = document.lineAt(lineNo);
+            for (
+                // First time through outer loop, initialize charNo to start of `range`. Thereafter use 0, the start of the line.
+                let charNo = (lineNo === range.start.line ? range.start.character : 0); 
+                charNo < (lineNo === range.end.line ? range.end.character : line.range.end.character); 
+                ++charNo
+            ) {
+                const c = line.text[charNo];
+                if (c === ';') {
+                    break; // skip comment
+                } else if (isOpenBracket(c)) {
+                    nesting += 1;
+                } else if (isCloseBracket(c)) {
+                    nesting -= 1;
+                    if (nesting < minNesting) {
+                        minNesting = nesting;
+                    }
                 }
             }
         }
+    }
+
+    // if the first character is the closing bracket, nudge backward one character inside the expression.
+    // Otherwise opening bracket search fails because of an off-by-one error in the nesting calculation.
+    if (isCloseBracket(document.getText(range.with({ end: range.start.translate(0, 1) })))) {
+        range = range.with({ start: document.positionAt(document.offsetAt(range.start) - 1) });
     }
     
     // rewind to opening bracket
@@ -549,7 +557,7 @@ export async function findEnclosingEnumOrMask(document: vscode.TextDocument, pos
     if (!openParen) {
         return undefined;
     }
-    
+
     const searchRx = new RegExp(_anyMaskOrEnumRx());
     const result = searchRx.exec(document.getText(new vscode.Range(openParen, pos)));
     if (result) {
