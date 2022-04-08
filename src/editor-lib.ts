@@ -113,6 +113,47 @@ export function resolveSymbol(
 }
 
 /**
+ * Translate ranges from a block of text into equivalent ranges offset within a document.
+ * @param text A block of text referenced by the textRanges array.
+ * @param textRanges An array of ranges within the text.
+ * @param newline The newline character to use when splitting the text.
+ * @param document The document for which to compute the ranges.
+ * @param documentPos The position within the document at which the text block.
+ * @returns ranges within the document corresponding to the textRanges array.
+ */
+export function textRangesToDocumentRanges(
+    text: string,
+    textRanges: vscode.Range[],
+    newline: string,
+    document: vscode.TextDocument, 
+    documentPos: vscode.Position)
+: vscode.Range[] {
+    const textLines = text.split(newline);
+    const textLineStarts = new Uint32Array(textLines.length);
+
+    // compute the offsets of each line start within the text block
+    let textOffset = 0;
+    for (let index = 0; index < textLines.length; index++) {
+        textLineStarts[index] = textOffset;
+        textOffset += textLines[index].length + newline.length;
+    }
+
+    const documentRanges = textRanges.map(textRange => {
+        // convert the text range to offsets within the text block
+        const textStartOffset = textLineStarts[textRange.start.line] + textRange.start.character;
+        const textEndOffset = textLineStarts[textRange.end.line] + textRange.end.character;
+        const docPosOffset = document.offsetAt(documentPos);
+        
+        // translate the text offsets to document positions
+        const docStart = document.positionAt(docPosOffset + textStartOffset);
+        const docEnd = document.positionAt(docPosOffset + textEndOffset);
+        return new vscode.Range(docStart, docEnd);
+    });
+
+    return documentRanges;
+}
+
+/**
  * Find the first occurrence of a regex match within a document starting at the given position.
  * @param uri The document to search
  * @param pos The position at which to begin searching

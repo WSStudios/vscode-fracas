@@ -11,7 +11,9 @@ import { getOrDefault } from "./containers";
 import {
     getSelectedSymbol,
     diffToTextEdits,
-    withFilePath
+    withFilePath,
+    resolveRange,
+    textRangesToDocumentRanges
 } from "./editor-lib";
 import { findEnclosingExpression } from "./fracas/syntax";
 import {
@@ -179,7 +181,7 @@ export function showOutput(terminals: Map<string, vscode.Terminal>): void {
 export async function formatFracasDocument(
     frcDoc?: vscode.TextDocument, 
     options?: vscode.FormattingOptions,
-    range?: vscode.Range
+    range?: vscode.Range | vscode.Position
 ): Promise<vscode.TextEdit[]> {
     // use the open document if none is provided
     if (frcDoc === undefined) {
@@ -190,21 +192,28 @@ export async function formatFracasDocument(
     if (frcDoc !== undefined) {
         // Expand selection range to a valid expression
         if (range) {
+            range = resolveRange(range);
+            console.log(frcDoc.getText(range) + "\n");
             range = findEnclosingExpression(frcDoc, range);
+            if (!range || range.isEmpty) {
+                return [];
+            }
         }
 
         // Invoke yasi to generate formatted text.
+        const fracasText = frcDoc.getText(range);
         const indent = options?.tabSize ?? 2;
         const formatCmd = `"${getPython()}" "${getFormatterScript()}" --diff --indent-size ${indent}`;
+        console.log(fracasText);
         console.log(formatCmd);
-        const diff = await execShell(formatCmd, frcDoc.getText(range) + "\n");
+        const diff = await execShell(formatCmd, fracasText.endsWith("\n") ? fracasText : fracasText + "\n");
 
         // convert diff to text edits and move them to the correct position
         if (diff) {
             const newline = frcDoc.eol === vscode.EndOfLine.LF ? "\n" : "\r\n";
             const edits = diffToTextEdits(diff, newline);
-            if (range) {
-                _translateEditsBy(edits, range.start, newline);
+            if (range && range.start.isAfter(new vscode.Position(0, 0))) {
+                _textEditsToDocumentEdits(fracasText, edits, frcDoc, range.start, newline);
             }
             return edits;
         }
@@ -213,15 +222,22 @@ export async function formatFracasDocument(
     return [];
 }
 
-function _translateEditsBy(edits: vscode.TextEdit[], offset: vscode.Position, newline = "\r\n"
+function _textEditsToDocumentEdits(
+    editedText: string,
+    textEdits: vscode.TextEdit[], 
+    document: vscode.TextDocument,
+    documentPos: vscode.Position, 
+    newline = "\r\n"
 ): void {
     // offset the edits by the offset
-    const exprIndent = " ".repeat(offset.character);
-    for (const edit of edits) {
-        // Offset the text edits to the position of the selected expression
-        edit.range = new vscode.Range(
-            edit.range.start.translate(offset.line, offset.character),
-            edit.range.end.translate(offset.line, offset.character));
+    const exprIndent = " ".repeat(documentPos.character);
+    const editRanges = textEdits.map(edit => edit.range);
+    // Translate text edit offsets to the position of the selected expression
+    const documentRanges = textRangesToDocumentRanges(editedText, editRanges, newline, document, documentPos);
+    
+    for (let index = 0; index < textEdits.length; index++) {
+        const edit = textEdits[index];
+        edit.range = documentRanges[index];
         // Indent the text edit lines to match the selected expression
         if (exprIndent.length > 0) {
             edit.newText = edit.newText
