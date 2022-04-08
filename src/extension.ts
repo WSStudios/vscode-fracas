@@ -155,6 +155,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         fracasDocumentFilter, fracasFormatter));
     context.subscriptions.push(vscode.languages.registerDocumentRangeFormattingEditProvider(
         fracasDocumentFilter, fracasFormatter));
+    context.subscriptions.push(vscode.languages.registerOnTypeFormattingEditProvider(
+        fracasDocumentFilter, fracasFormatter, ')', '}', ']'));
 
     // Setup project config
     // save the location of yasi for use in document formatting.
