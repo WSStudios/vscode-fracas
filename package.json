@@ -3,7 +3,7 @@
     "publisher": "Wonderstorm",
     "displayName": "Fracas",
     "description": "Syntax highlighting, code navigation, document formatting, and REPL support for the Fracas and Racket programming languages",
-    "version": "0.1.14",
+    "version": "0.1.15",
     "enabledApiProposals": [
         "textSearchProvider",
         "findTextInFiles"
@@ -68,7 +68,17 @@
                 "editor.rulers": [
                     102
                 ],
-                "editor.wordSeparators": "()[]{}\",'`;#|:"
+                "editor.wordSeparators": "()[]{}\",'`;#|:",
+                "editor.tabSize": 2,
+                "editor.formatOnPaste": true,
+                "editor.formatOnSave": true,
+                "editor.formatOnSaveMode": "modifications",
+                "editor.formatOnType": true,
+                "editor.guides.bracketPairs": true,
+                "editor.guides.bracketPairsHorizontal": true,
+                "editor.guides.highlightActiveBracketPair": true,
+                "editor.autoClosingOvertype": "auto",
+                "editor.bracketPairColorization.enabled": true
             }
         },
         "languages": [
@@ -110,23 +120,11 @@
         "configuration": {
             "title": "Fracas",
             "properties": {
-                "vscode-fracas.general.projectDir": {
+                "vscode-fracas.general.projectWorkspaceFolder": {
                     "type": "string",
-                    "default": "C:\\proj\\ws\\tdp1\\wslib",
-                    "markdownDescription": "`racket` working directory and base directory for collection paths.",
+                    "default": "wslib",
+                    "markdownDescription": "Workspace folder for `racket` working directory and base collection paths.",
                     "order": 0
-                },
-                "vscode-fracas.general.racketPath": {
-                    "type": "string",
-                    "default": "C:\\Progra~1\\Racket\\racket.EXE",
-                    "markdownDescription": "Path to the `racket` executable used to launch the Racket language server.",
-                    "order": 1
-                },
-                "vscode-fracas.general.REPLRacketPath": {
-                    "type": "string",
-                    "default": "C:\\Progra~1\\Racket\\racket.EXE",
-                    "markdownDescription": "Path to the `racket` executable used to open the REPL and run the file.",
-                    "order": 2
                 },
                 "vscode-fracas.general.racketCollectionPaths": {
                     "type": "array",
@@ -137,19 +135,13 @@
                         ".",
                         "..\\fracas\\lib"
                     ],
-                    "markdownDescription": "Paths to search for Racket collections. Relative to __Project Dir__",
-                    "order": 3
-                },
-                "vscode-fracas.general.ninjaPath": {
-                    "type": "string",
-                    "default": "ninja",
-                    "markdownDescription": "Path to the `ninja` executable used to precompile racket files.",
-                    "order": 4
+                    "markdownDescription": "Paths to search for Racket collections. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
+                    "order": 1
                 },
                 "vscode-fracas.localization.stringTableRegistryFile": {
                     "type": "string",
                     "default": "..\\tdp1.unreal\\Source\\Data\\TdpLocalization.cpp",
-                    "markdownDescription": "Path to the generated C++ source file that registers localized text tables with the UE4 project. Relative to __Project Dir__",
+                    "markdownDescription": "Path to the generated C++ source file that registers localized text tables with the UE4 project. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
                     "order": 5
                 },
                 "vscode-fracas.localization.stringTableSourcePaths": {
@@ -161,13 +153,13 @@
                         "fracas\\localization-defines.frc",
                         "fracas\\text\\localized-text*.frc"
                     ],
-                    "markdownDescription": "Glob patterns of fracas source files containing localized text. Used to generated the *String Table Registry File*. Relative to __Project Dir__",
+                    "markdownDescription": "Glob patterns of fracas source files containing localized text. Used to generated the *String Table Registry File*. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
                     "order": 6
                 },
                 "vscode-fracas.localization.stringTableDestDir": {
                     "type": "string",
                     "default": "..\\tdp1.unreal\\Content\\GameData\\Localization\\",
-                    "markdownDescription": "Directory with generated CSV files containing localized text tables. Relative to __Project Dir__",
+                    "markdownDescription": "Directory with generated CSV files containing localized text tables. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
                     "order": 7
                 },
                 "vscode-fracas.trace.server": {
@@ -375,12 +367,17 @@
         "eslint-plugin-prettier": "^4.0.0",
         "eslint-plugin-promise": "^5.1.0",
         "glob": "^7.1.7",
-        "mocha": "^9.1.3",
+        "mocha": "^9.2.2",
         "prettier": "^2.3.2",
         "typescript": "^4.3.2",
         "vscode-test": "^1.5.2"
     },
     "dependencies": {
+        "@types/ini": "^1.3.31",
+        "@types/tmp": "^0.2.3",
+        "ini": "^2.0.0",
+        "tmp": "^0.2.1",
+        "tmp-promise": "^3.0.3",
         "vscode-languageclient": "^7.0.0"
     }
 }

@@ -6,6 +6,7 @@ import {
     getSelectedSymbol, 
     regexGroupDocumentLocation, 
     regexGroupUriLocation, 
+    resolveRange, 
     resolveSymbol, 
     searchBackward 
 } from '../editor-lib';
@@ -360,26 +361,77 @@ export async function findComment(uri: vscode.Uri, position: vscode.Position): P
     return comment;
 }
 
+export function isOpenBracket(char: string): boolean {
+    return char === '(' || char === '{' || char === '[';
+}
+
+export function isCloseBracket(char: string): boolean {
+    return char === ')' || char === '}' || char === ']';
+}
+
 export function findOpenBracket(
     document: vscode.TextDocument,
-    pos: vscode.Position,
+    pos: vscode.Position | vscode.Range,
     includeBrackets = true
-): vscode.Position {
-    // first rewind to opening bracket
-    let nesting = 0;
-    for (let lineNo = pos.line; lineNo >= 0; --lineNo) {
+): vscode.Position | undefined {
+    // compute initial nesting based on how many expression borders overlap the range.
+    // e.g. if the selection within ( (hi)(ho) ) covers [i)(h] then the initial nesting at 'i' is -1
+    let range = resolveRange(pos);
+    // const firstChar = document.getText(new vscode.Range(range.start, range.start.translate(0, 1)));
+    // const lastChar = document.getText(new vscode.Range(range.end, range.end.translate(0, -1)));
+    let nesting = 0; 
+    let minNesting = 0; // isCloseBracket(lastChar) && !isOpenBracket(firstChar) ? -1 : 0; // nudge nesting inside the expression
+    
+    if (!range.isEmpty) {
+        for (let lineNo = range.start.line; lineNo <= range.end.line; ++lineNo) {
+            const line = document.lineAt(lineNo);
+            for (
+                // First time through outer loop, initialize charNo to start of `range`. Thereafter use 0, the start of the line.
+                let charNo = (lineNo === range.start.line ? range.start.character : 0); 
+                charNo < (lineNo === range.end.line ? range.end.character : line.range.end.character); 
+                ++charNo
+            ) {
+                const c = line.text[charNo];
+                if (c === ';') {
+                    break; // skip comment
+                } else if (isOpenBracket(c)) {
+                    nesting += 1;
+                } else if (isCloseBracket(c)) {
+                    nesting -= 1;
+                    if (nesting < minNesting) {
+                        minNesting = nesting;
+                    }
+                }
+            }
+        }
+    }
+
+    // if the first character is the closing bracket, nudge backward one character inside the expression.
+    // Otherwise opening bracket search fails because of an off-by-one error in the nesting calculation.
+    if (isCloseBracket(document.getText(range.with({ end: range.start.translate(0, 1) })))) {
+        range = range.with({ start: document.positionAt(document.offsetAt(range.start) - 1) });
+    }
+    
+    // rewind to opening bracket
+    for (let lineNo = range.start.line; lineNo >= 0; --lineNo) {
         const line = document.lineAt(lineNo);
 
         // pre-strip comments as we'll be scanning the string from end to start
         const nonCommentMatch = /([^;])*/.exec(line.text);
         const textBeforeComment = nonCommentMatch ? nonCommentMatch[0] : line.text;
 
-        // scan backward from end of line to find opening bracket
-        for (let charNo = (lineNo === pos.line ? pos.character : line.range.end.character); charNo >= line.range.start.character; --charNo) {
+        // scan backward from the start of the selection range to find the opening bracket
+        for (
+            // First time through outer loop, initialize charNo to selection `range` start. Thereafter use the end of the line.
+            let charNo = (lineNo === range.start.line ? range.start.character : line.range.end.character); 
+            charNo >= line.range.start.character; 
+            --charNo
+        ) {
             const c = textBeforeComment[charNo];
-            if (c === '(' || c === '[' || c === '{') {
-                nesting += 1;
-                if (nesting >= 1) {
+            if (isOpenBracket(c)) {
+                nesting -= 1; // decrement nesting when moving backward outside a bracket pair
+                // if we've found an opening bracket nested outside the range start, then we're done
+                if (nesting < minNesting) {
                     const openParen = new vscode.Position(lineNo, charNo);
                     if (includeBrackets) {
                         return openParen;
@@ -387,21 +439,25 @@ export function findOpenBracket(
                         return document.positionAt(document.offsetAt(openParen) + 1);
                     }
                 }
-            } else if (c === ')' || c === ']' || c === '}') {
-                nesting -= 1;
+            } else if (isCloseBracket(c)) {
+                nesting += 1;
             }
         }
     }
-    return new vscode.Position(0, 0);
+    return undefined;
 }
 
-export function findBracketPair(
+export function findEnclosingExpression(
     document: vscode.TextDocument,
-    pos: vscode.Position,
+    pos: vscode.Position | vscode.Range,
     includeBrackets = true
-): vscode.Range {
+): vscode.Range | undefined {
     // first rewind to opening bracket
     const openParen = findOpenBracket(document, pos, includeBrackets);
+    if (!openParen) {
+        return undefined;
+    }
+
     let nesting = includeBrackets ? 0 : 1; // if we're not including the brackets, we're already one nesting deep
 
     // scan forward from opening bracket to closing bracket
@@ -411,21 +467,23 @@ export function findBracketPair(
             const c = line.text[charNo];
             if (c === ';') {
                 break; // skip comment
-            } else if (c === '(' || c === '[' || c === '{') {
+            } else if (isOpenBracket(c)) {
                 nesting += 1;
-            } else if (c === ')' || c === ']' || c === '}') {
+            } else if (isCloseBracket(c)) {
                 nesting -= 1;
                 if (nesting <= 0) {
-                    let closeParen = new vscode.Position(lineNo, charNo);
+                    let closeParen = new vscode.Position(lineNo, charNo + 1);
                     if (!includeBrackets) {
                         closeParen = document.positionAt(document.offsetAt(closeParen) - 1);
                     }
+                    return new vscode.Range(openParen, closeParen);
                 }
             }
         }
     }
     return new vscode.Range(openParen, new vscode.Position(document.lineCount - 1, document.lineAt(document.lineCount - 1).range.end.character));
 }
+
 
 function _rangesAtScope(
     document: vscode.TextDocument,
@@ -434,7 +492,7 @@ function _rangesAtScope(
 ): vscode.Range[] {
     const ranges: vscode.Range[] = [];
     // first rewind to opening bracket
-    const startPos = findOpenBracket(document, pos, false);
+    const startPos = findOpenBracket(document, pos, false) ?? new vscode.Position(0,0);
     let topExprPos = startPos;
     let nesting = 1; // if we're not including the brackets, we're already one nesting deep
 
@@ -445,12 +503,12 @@ function _rangesAtScope(
             const c = line.text[charNo];
             if (c === ';') {
                 break; // skip comment
-            } else if (c === '(' || c === '[' || c === '{') {
+            } else if (isOpenBracket(c)) {
                 if (nesting === scopeNestingDepth) { // only include lines that appear at top-level scope.
                     topExprPos = new vscode.Position(lineNo, charNo);
                 }
                 nesting += 1;
-            } else if (c === ')' || c === ']' || c === '}') {
+            } else if (isCloseBracket(c)) {
                 nesting -= 1;
                 if (nesting === scopeNestingDepth) { // only include lines that appear at top-level scope.
                     ranges.push(new vscode.Range(topExprPos, new vscode.Position(lineNo, charNo)));
@@ -479,6 +537,10 @@ export async function findEnclosingDefine(uri: vscode.Uri, pos: vscode.Position
 export async function findEnclosingConstructor(document: vscode.TextDocument, pos: vscode.Position
 ): Promise<{location: vscode.Location, typeName: string} | undefined> {
     const openParen = findOpenBracket(document, pos);
+    if (!openParen) {
+        return undefined;
+    }
+
     const searchRx = new RegExp(_anyConstructorRx());
     const result = searchRx.exec(document.getText(new vscode.Range(openParen, pos)));
     if (result) {
@@ -492,6 +554,10 @@ export async function findEnclosingConstructor(document: vscode.TextDocument, po
 export async function findEnclosingEnumOrMask(document: vscode.TextDocument, pos: vscode.Position
 ): Promise<FracasDefinition | undefined> {
     const openParen = findOpenBracket(document, pos);
+    if (!openParen) {
+        return undefined;
+    }
+
     const searchRx = new RegExp(_anyMaskOrEnumRx());
     const result = searchRx.exec(document.getText(new vscode.Range(openParen, pos)));
     if (result) {
@@ -606,8 +672,8 @@ export async function findKeywordDefinition(
     searchKind: SearchKind = SearchKind.wholeMatch
 ): Promise<FracasDefinition[]> {
     const activeEditor = vscode.window.activeTextEditor;
-    referencingDocument = referencingDocument || activeEditor?.document;
-    documentSelection = documentSelection || activeEditor?.selection;
+    referencingDocument = referencingDocument ?? activeEditor?.document;
+    documentSelection = documentSelection ?? activeEditor?.selection;
     if (!referencingDocument || !documentSelection) {
         return [];
     }
@@ -645,8 +711,8 @@ export async function findEnumOrMaskMembers(
     searchKind: SearchKind = SearchKind.wholeMatch
 ): Promise<FracasDefinition[]> {
     const activeEditor = vscode.window.activeTextEditor;
-    referencingDocument = referencingDocument || activeEditor?.document;
-    documentPosition = documentPosition || activeEditor?.selection?.active;
+    referencingDocument = referencingDocument ?? activeEditor?.document;
+    documentPosition = documentPosition ?? activeEditor?.selection?.active;
     if (!referencingDocument || !documentPosition) {
         return [];
     }
@@ -726,8 +792,8 @@ export async function findReferences(
     token?: vscode.CancellationToken
 ): Promise<vscode.Location[]> {
     const activeEditor = vscode.window.activeTextEditor;
-    referencingDocument = referencingDocument || activeEditor?.document;
-    referencingPosition = referencingPosition || activeEditor?.selection.anchor;
+    referencingDocument = referencingDocument ?? activeEditor?.document;
+    referencingPosition = referencingPosition ?? activeEditor?.selection.anchor;
     if (!referencingDocument || !referencingPosition) {
         return [];
     }
@@ -760,11 +826,11 @@ export async function findDocumentSymbols(
     const textMatches = await findTextInFiles(defineRxStr, token, uri.fsPath);
     const symbols = textMatches.map(searchMatch => {
         const rxMatch = defineRx.exec(searchMatch.preview.text);
-        const [_, defToken, typeName] = rxMatch || [undefined, undefined, searchMatch.preview.text];
+        const [_, defToken, typeName] = rxMatch ?? [undefined, undefined, searchMatch.preview.text];
         const symbol = new vscode.DocumentSymbol(
-            typeName || 'unknown',
+            typeName ?? 'unknown',
             searchMatch.preview.text,
-            symbolKind(definitionKind(defToken || 'define')),
+            symbolKind(definitionKind(defToken ?? 'define')),
             getRange(searchMatch.ranges),
             getRange(searchMatch.ranges)
         );
@@ -900,7 +966,7 @@ export async function findMembers(
             members.push(...enumMembers);
         }
     } else { // for types other than enums and masks, use the regexp to find members
-        const fieldRx = _memberDeclRx(fracasDef.kind, memberName || '', searchKind);
+        const fieldRx = _memberDeclRx(fracasDef.kind, memberName ?? '', searchKind);
         for (const range of ranges) {
             // search at this scope for members
             const expr = document.getText(range);

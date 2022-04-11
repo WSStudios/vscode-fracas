@@ -1,33 +1,23 @@
-import * as fs from "fs";
 import * as path from "path";
+import * as tmpPromise from "tmp-promise";
+import { TextEncoder } from "util";
 import * as vscode from "vscode";
+import * as config from "./config";
 import { getOrDefault } from "./containers";
-import { getSelectedSymbol, withFilePath } from "./editor-lib";
-import {
-    createTerminal,
-    runFileInTerminal,
-    createRepl,
-    loadFileInRepl,
-    executeSelectionInRepl,
-    withRepl,
-} from "./repl";
-import { 
-    execShell, 
-    getRacket, 
-    openRacketReference, 
-    kebabCaseToPascalCase, 
-    withRacket 
-} from "./utils";
+import * as editorLib from "./editor-lib";
+import { findEnclosingExpression } from "./fracas/syntax";
+import * as repl from "./repl";
+import * as utils from "./utils";
 
 export function helpWithSelectedSymbol(): void {
-    const fracasObject = getSelectedSymbol();
+    const fracasObject = editorLib.getSelectedSymbol();
     if (fracasObject) {
-        openRacketReference(fracasObject);
+        utils.openRacketReference(fracasObject);
     }
 }
 
 export function runInTerminal(terminals: Map<string, vscode.Terminal>): void {
-    withRacket((racket: string, racketArgs: string[]) => {
+    utils.withRacketShellCmd((racketCmd: string) => {
         const document = vscode.window.activeTextEditor?.document;
         if (document) {
             document.save();
@@ -39,24 +29,24 @@ export function runInTerminal(terminals: Map<string, vscode.Terminal>): void {
                     .getConfiguration("vscode-fracas.outputTerminal")
                     .get("numberOfOutputTerminals") === "one"
             ) {
-                terminal = getOrDefault(terminals, "one", () => createTerminal(null));
+                terminal = getOrDefault(terminals, "one", () => repl.createTerminal(null));
             } else {
-                terminal = getOrDefault(terminals, filePath, () => createTerminal(filePath));
+                terminal = getOrDefault(terminals, filePath, () => repl.createTerminal(filePath));
             }
-            runFileInTerminal(racket, racketArgs, filePath, terminal);
+            repl.runFileInTerminal(racketCmd, filePath, terminal);
         }
     });
 }
 
 export function loadInRepl(repls: Map<string, vscode.Terminal>): void {
-    withRacket((racket: string, racketArgs: string[]) => {
+    utils.withRacketShellCmd((racketCmd: string) => {
         const document = vscode.window.activeTextEditor?.document;
         if (document) {
             document.save();
             const filePath = path.resolve(document.fileName);
 
-            const repl = getOrDefault(repls, filePath, () => createRepl(path.basename(filePath), racket, racketArgs));
-            loadFileInRepl(filePath, repl);
+            const replTerminal = getOrDefault(repls, filePath, () => repl.createRepl(path.basename(filePath), racketCmd));
+            repl.loadFileInRepl(filePath, replTerminal);
         }
     });
 }
@@ -64,7 +54,7 @@ export function loadInRepl(repls: Map<string, vscode.Terminal>): void {
 export async function executeSelection(repls: Map<string, vscode.Terminal>): Promise<void> {
     const filePath = vscode.window.activeTextEditor?.document?.fileName;
     if (filePath) {
-        await withRepl(repls, filePath, executeSelectionInRepl);
+        await repl.withRepl(repls, filePath, repl.executeSelectionInRepl);
     }
 }
 
@@ -73,23 +63,20 @@ export async function executeSelection(repls: Map<string, vscode.Terminal>): Pro
  * names, and invokes racket to generate TdpLocalization.cpp/h
  */
 export async function makeStringTableImport(): Promise<void> {
-    const [racket, racketArgs] = getRacket();
+    const racket = config.getRacketShellCmd();
     const stringTableCpp = vscode.workspace
         .getConfiguration("vscode-fracas.general")
-        .get<string>("stringTableRegistryFile") 
-        || "..\\tdp1.unreal\\Source\\Data\\Private\\TdpLocalization.cpp";
-    const projectDir = vscode.workspace
-        .getConfiguration("vscode-fracas.general")
-        .get<string>("projectDir") || ".";
+        .get<string>("stringTableRegistryFile")
+        ?? "..\\tdp1.unreal\\Source\\Data\\Private\\TdpLocalization.cpp";
+    const projectDir = config.getProjectDir();
     const stringTableDestDir = vscode.workspace
         .getConfiguration("vscode-fracas.localization")
-        .get<string>("stringTableDestDir") || ".";
+        .get<string>("stringTableDestDir") ?? ".";
     const stringTableSourcePaths = vscode.workspace
         .getConfiguration("vscode-fracas.localization")
-        .get<string[]>("stringTableSourcePaths") || [];
+        .get<string[]>("stringTableSourcePaths") ?? [];
 
-    if (racket) 
-    {
+    if (racket) {
         const textFrcFiles = [];
         for (const pathPattern of stringTableSourcePaths) {
             const glob = new vscode.RelativePattern(vscode.Uri.file(projectDir), pathPattern);
@@ -97,30 +84,30 @@ export async function makeStringTableImport(): Promise<void> {
         }
         textFrcFiles.sort();
         const csvFiles = textFrcFiles.map(frcFile => {
-            const csvBaseName = kebabCaseToPascalCase(path.basename(frcFile.fsPath, ".frc"));
+            const csvBaseName = utils.kebabCaseToPascalCase(path.basename(frcFile.fsPath, ".frc"));
             const csvFile = path.resolve(`${projectDir}\\${stringTableDestDir}\\${csvBaseName}.csv`);
             return csvFile;
         });
 
         console.log(`Generating ${textFrcFiles.length} text source files into "${stringTableCpp}"`);
-        execShell(`${racket} ${racketArgs.join(" ")} ../fracas/lib/fracas/make-string-table-import.rkt -- ${csvFiles.join(" ")}`);
+        await utils.execShell(`${racket} ../fracas/lib/fracas/make-string-table-import.rkt -- ${csvFiles.join(" ")}`);
     }
 }
 
-export function compileFracasObject(filePath: string, fracasObject: string): void {
-    const [racket, racketArgs] = getRacket();
+export async function compileFracasObject(filePath: string, fracasObject: string): Promise<void> {
+    const racket = config.getRacketShellCmd();
     if (fracasObject && filePath && racket) {
         vscode.window.activeTextEditor?.document?.save();
         const cmd = `(require fracas/make-asset) (enter! (file "${filePath}")) (define-asset-impl: #:value ${fracasObject} #:value-name (quote ${fracasObject}) #:key (key: ${fracasObject}))`;
-        execShell(`${racket} ${racketArgs.join(" ")} -e "${cmd.replace(/"/g, '\\"')}"`);
+        await utils.execShell(`${racket} -e "${cmd.replace(/"/g, '\\"')}"`);
     }
 }
 
 let lastFracasObject = "";
 let lastFracasFile = "";
 export function compileSelectedFracasObject(): void {
-    lastFracasFile = vscode.window.activeTextEditor?.document?.fileName || "";
-    lastFracasObject = getSelectedSymbol();
+    lastFracasFile = vscode.window.activeTextEditor?.document?.fileName ?? "";
+    lastFracasObject = editorLib.getSelectedSymbol();
     compileFracasObject(lastFracasFile, lastFracasObject);
 }
 
@@ -128,7 +115,7 @@ export function recompileFracasObject(): void {
     compileFracasObject(lastFracasFile, lastFracasObject);
 }
 
-export function precompileFracasFile(frcDoc: vscode.TextDocument | undefined = undefined): void {
+export async function precompileFracasFile(frcDoc: vscode.TextDocument | undefined = undefined): Promise<void> {
     // use the open document if none is provided
     if (frcDoc === undefined) {
         frcDoc = vscode.window.activeTextEditor?.document;
@@ -137,40 +124,29 @@ export function precompileFracasFile(frcDoc: vscode.TextDocument | undefined = u
     // if there is a fracas document, precompile it
     if (frcDoc && frcDoc.languageId === "fracas") {
         frcDoc.save(); // save the document before precompiling
-        
-        const ninja = vscode.workspace
-            .getConfiguration("vscode-fracas.general")
-            .get<string>("ninjaPath") || "ninja";
-        
-        // determine the .zo file from the fracas file
-        const frcPath = path.parse(path.resolve(frcDoc.fileName));
-        const upperRoot = frcPath.root.toUpperCase(); // ninja requires that the drive letter be uppercase
-        const zoFile = `${upperRoot}${frcPath.dir.substring(upperRoot.length)}/compiled/${frcPath.name}_frc.zo`;
 
-        // If the precompiled zo file exists, invoke ninja to update it
-        fs.access(zoFile, fs.constants.R_OK, (err) => {
-            if (err) {
-                console.log(`Skipping precompile of ${zoFile} because it does not exist`);
-            } else {
-                const ninjaCmd = `${ninja} -f ./build/build_precompile.ninja ${zoFile}`;
-                console.log(ninjaCmd);
-                execShell(ninjaCmd);
-            }
-        });
+        const ninja = config.getNinja();
+
+        // Invoke ninja to update all precompiled zo file dependencies
+        console.log(`Precompiling fracas files because ${frcDoc.fileName} has changed`);
+        const precompileNinjaFile = path.join("build", "build_precompile.ninja");
+        const ninjaCmd = `"${ninja}" -f "${precompileNinjaFile}"`;
+        console.log(ninjaCmd);
+        await utils.execShell(ninjaCmd);
     }
 }
 
 export function openRepl(repls: Map<string, vscode.Terminal>): void {
-    withFilePath((filePath: string) => {
-        withRacket((racket: string, racketArgs: string[]) => {
-            const repl = getOrDefault(repls, filePath, () => createRepl(path.basename(filePath), racket, racketArgs));
-            repl.show();
+    editorLib.withFilePath((filePath: string) => {
+        utils.withRacketShellCmd((racketCmd: string) => {
+            const replTerminal = getOrDefault(repls, filePath, () => repl.createRepl(path.basename(filePath), racketCmd));
+            replTerminal.show();
         });
     });
 }
 
 export function showOutput(terminals: Map<string, vscode.Terminal>): void {
-    withFilePath((filePath: string) => {
+    editorLib.withFilePath((filePath: string) => {
         const terminal = terminals.get(filePath);
         if (terminal) {
             terminal.show();
@@ -178,4 +154,79 @@ export function showOutput(terminals: Map<string, vscode.Terminal>): void {
             vscode.window.showErrorMessage("No output terminal exists for this file");
         }
     });
+}
+
+export async function formatFracasDocument(
+    frcDoc?: vscode.TextDocument, 
+    options?: vscode.FormattingOptions,
+    range?: vscode.Range | vscode.Position
+): Promise<vscode.TextEdit[]> {
+    // use the open document if none is provided
+    if (frcDoc === undefined) {
+        frcDoc = vscode.window.activeTextEditor?.document;
+    }
+
+    // if there is a fracas document, format it
+    if (frcDoc !== undefined) {
+        // Expand selection range to a valid expression
+        if (range) {
+            range = editorLib.resolveRange(range);
+            // console.log(frcDoc.getText(range) + "\n");
+            range = findEnclosingExpression(frcDoc, range);
+            if (!range || range.isEmpty) {
+                return [];
+            }
+        }
+
+        // Invoke yasi to generate formatted text.
+        const fracasText = frcDoc.getText(range);
+        const newline = frcDoc.eol === vscode.EndOfLine.LF ? "\n" : "\r\n";
+        const diff = await tmpPromise.withFile(f => {
+            const fileBytes = new TextEncoder().encode(fracasText.endsWith(newline) ? fracasText : fracasText + newline);
+            vscode.workspace.fs.writeFile(vscode.Uri.file(f.path), fileBytes);
+            const indent = options?.tabSize ?? 2;
+            const formatCmd = `"${config.getPython()}" "${config.getFormatterScript()}" --diff --indent-size ${indent} ${f.path}`;
+            // console.log(fracasText);
+            console.log(formatCmd);
+            return utils.execShell(formatCmd);
+        });
+
+        // convert diff to text edits and move them to the correct position
+        if (diff) {
+            const edits = editorLib.diffToTextEdits(diff, newline);
+            if (range && range.start.isAfter(new vscode.Position(0, 0))) {
+                _textEditsToDocumentEdits(fracasText, edits, frcDoc, range.start, newline);
+            }
+            return edits;
+        }
+    }
+
+    return [];
+}
+
+function _textEditsToDocumentEdits(
+    editedText: string,
+    textEdits: vscode.TextEdit[], 
+    document: vscode.TextDocument,
+    documentPos: vscode.Position, 
+    newline = "\r\n"
+): void {
+    // offset the edits by the offset
+    const exprIndent = " ".repeat(documentPos.character);
+    const editRanges = textEdits.map(edit => edit.range);
+    // Translate text edit offsets to the position of the selected expression
+    const documentRanges = editorLib.textRangesToDocumentRanges(editedText, editRanges, newline, document, documentPos);
+    
+    for (let index = 0; index < textEdits.length; index++) {
+        const edit = textEdits[index];
+        edit.range = documentRanges[index];
+        // Indent the text edit lines to match the selected expression
+        if (exprIndent.length > 0) {
+            edit.newText = edit.newText
+                .split(newline)
+                .map(line => exprIndent + line) // prepend the indent to each line
+                .join(newline)
+                .substring(exprIndent.length); // drop indent from first line, which is already indented.
+        }
+    }
 }
