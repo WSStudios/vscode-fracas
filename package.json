@@ -374,7 +374,10 @@
     },
     "dependencies": {
         "@types/ini": "^1.3.31",
+        "@types/tmp": "^0.2.3",
         "ini": "^2.0.0",
+        "tmp": "^0.2.1",
+        "tmp-promise": "^3.0.3",
         "vscode-languageclient": "^7.0.0"
     }
 }

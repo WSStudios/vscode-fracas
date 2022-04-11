@@ -1,4 +1,6 @@
 import * as path from "path";
+import * as tmpPromise from "tmp-promise";
+import { TextEncoder } from "util";
 import * as vscode from "vscode";
 import * as config from "./config";
 import { getOrDefault } from "./containers";
@@ -178,15 +180,19 @@ export async function formatFracasDocument(
 
         // Invoke yasi to generate formatted text.
         const fracasText = frcDoc.getText(range);
-        const indent = options?.tabSize ?? 2;
-        const formatCmd = `"${config.getPython()}" "${config.getFormatterScript()}" --diff --indent-size ${indent}`;
-        // console.log(fracasText);
-        console.log(formatCmd);
-        const diff = await utils.execShell(formatCmd, fracasText.endsWith("\n") ? fracasText : fracasText + "\n");
+        const newline = frcDoc.eol === vscode.EndOfLine.LF ? "\n" : "\r\n";
+        const diff = await tmpPromise.withFile(f => {
+            const fileBytes = new TextEncoder().encode(fracasText.endsWith(newline) ? fracasText : fracasText + newline);
+            vscode.workspace.fs.writeFile(vscode.Uri.file(f.path), fileBytes);
+            const indent = options?.tabSize ?? 2;
+            const formatCmd = `"${config.getPython()}" "${config.getFormatterScript()}" --diff --indent-size ${indent} ${f.path}`;
+            // console.log(fracasText);
+            console.log(formatCmd);
+            return utils.execShell(formatCmd);
+        });
 
         // convert diff to text edits and move them to the correct position
         if (diff) {
-            const newline = frcDoc.eol === vscode.EndOfLine.LF ? "\n" : "\r\n";
             const edits = editorLib.diffToTextEdits(diff, newline);
             if (range && range.start.isAfter(new vscode.Position(0, 0))) {
                 _textEditsToDocumentEdits(fracasText, edits, frcDoc, range.start, newline);
