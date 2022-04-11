@@ -9,7 +9,7 @@ export function execShell(cmd: string, input?: string, workingDir?: string) : Pr
             { cwd: workingDir ?? getProjectDir() },
             (err, out) => {
                 if (err) {
-                    vscode.window.showErrorMessage(err.message);
+                    vscode.window.showErrorMessage(err.message + "\n" + out);
                     return reject(err);
                 }
                 return resolve(out);
