@@ -193,7 +193,7 @@ export async function formatFracasDocument(
         // Expand selection range to a valid expression
         if (range) {
             range = resolveRange(range);
-            console.log(frcDoc.getText(range) + "\n");
+            // console.log(frcDoc.getText(range) + "\n");
             range = findEnclosingExpression(frcDoc, range);
             if (!range || range.isEmpty) {
                 return [];
@@ -204,7 +204,7 @@ export async function formatFracasDocument(
         const fracasText = frcDoc.getText(range);
         const indent = options?.tabSize ?? 2;
         const formatCmd = `"${getPython()}" "${getFormatterScript()}" --diff --indent-size ${indent}`;
-        console.log(fracasText);
+        // console.log(fracasText);
         console.log(formatCmd);
         const diff = await execShell(formatCmd, fracasText.endsWith("\n") ? fracasText : fracasText + "\n");
 

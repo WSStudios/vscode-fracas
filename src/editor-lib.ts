@@ -264,6 +264,8 @@ export function diffToTextEdits(diff: string, newline = "\r\n"
     }
     // process hunks
     while (diffIdx < diffLines.length) {
+        // the hunk header is of the form @@ -<before_start>,<before_length> +<after_start>,<after_length> @@
+        // For example, @@ -6,15 +8,20 @@ describes a hunk at line 6 in the original text that is 15 lines long
         const hunk = /@@\s+-(\d+),(\d+)\s\+(\d+),(\d+)\s+@@/.exec(diffLines[diffIdx]);
         diffIdx += 1;
 
@@ -271,7 +273,7 @@ export function diffToTextEdits(diff: string, newline = "\r\n"
             const newText: string[] = [];
 
             // process hunk lines
-            let endCharacter = 0;
+            let endCharacter = 0; // tracks the original end position of the line within the source document
             while (diffIdx < diffLines.length) {
                 const line = diffLines[diffIdx];
                 const op = line.length > 0 ? line[0] : "";
@@ -289,8 +291,8 @@ export function diffToTextEdits(diff: string, newline = "\r\n"
             }
 
             // convert the hunk text to a TextEdit
-            const startLine = parseInt(hunk[1]) - 1;
-            const endLine = startLine + parseInt(hunk[2]) - 1;
+            const startLine = parseInt(hunk[1]) - 1; // from hunk header (convert to zero-based)
+            const endLine = startLine + parseInt(hunk[2]) - 1; // from hunk header
             const editRange = new vscode.Range(startLine, 0, endLine, endCharacter);
             edits.push(new vscode.TextEdit(editRange, newText.join(newline)));
         } else {

@@ -15,6 +15,7 @@ export function execShell(cmd: string, input?: string, workingDir?: string) : Pr
                 return resolve(out);
             });
 
+        // if an input is given, pipe it to the child process
         if (input && child.stdin) {
             const stdinStream = new stream.Readable();
             stdinStream.push(input);  // Add data to the internal queue for users of the stream to consume

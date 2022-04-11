@@ -119,6 +119,6 @@ export function getPython(): string {
     return path.join(unreal, "Engine", "Binaries", "ThirdParty", "Python3", kOsUe4Name, `python${kOsBinExt}`);
 }
 
-let yasiScript = "yasi_ws.py";
+let yasiScript = "yasi_ws.py"; // the full path isn't known until the extension is activated.
 export function getFormatterScript(): string { return yasiScript; }
 export function setFormatterScript(script: string): void { yasiScript = script; }
