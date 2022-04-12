@@ -6,12 +6,12 @@ import { type } from "os";
 const kOsType = type();
 const kOsCfgSuffix =
     kOsType === 'Linux' ? 'linux' :
-        kOsType === 'Darwin' ? 'macos' :
-            'windows';
+    kOsType === 'Darwin' ? 'macos' :
+    'windows';
 const kOsUe4Name =
     kOsType === 'Linux' ? 'Linux' :
-        kOsType === 'Darwin' ? 'Mac' :
-            'Win64';
+    kOsType === 'Darwin' ? 'Mac' :
+    'Win64';
 const kOsBinExt = kOsType === 'Windows_NT' ? '.exe' : '';
 
 export function getProjectFolder(): vscode.WorkspaceFolder {
@@ -66,10 +66,12 @@ export function watchProjectConfig(): void {
 export function getProjectConfig(sectionName: string, key: string): unknown {
     // find the first matching key in the config files
     for (const cfg of kCfgFiles) {
-        const section = cfg[sectionName] as Record<string, unknown>;
-        if (section) {
-            if (section[key]) {
-                return section[key];
+        for (const cfgSection in cfg) {
+            if (cfgSection.toLowerCase() === sectionName) {
+                const section = cfg[cfgSection] as Record<string, unknown>;
+                if (section[key]) {
+                    return section[key];
+                }
             }
         }
     }
@@ -96,12 +98,15 @@ export function getRacket(server = false): [string, string[]] {
     return [racketPath, racketArgs];
 }
 
+function _maybeQuote(input: string): string {
+    return input.includes(" ") ? `"${input}"` : input;
+}
+
 export function getRacketShellCmd(server = false): string {
     const [racket, racketArgs] = getRacket(server);
     // quote racket args
-    const racketArgString = racketArgs.length === 0 ? '' : 
-        `"${racketArgs.join('" "')}"`;
-    return `${racket} ${racketArgString}`;
+    const quotedArgs = racketArgs.reduce((argString, arg) => argString + " " + _maybeQuote(arg));
+    return _maybeQuote(racket) + " " + quotedArgs;
 }
 
 export function getNinja(): string {

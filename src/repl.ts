@@ -38,14 +38,11 @@ export function runFileInTerminal(
     terminal: vscode.Terminal,
 ): void {
     terminal.show();
-    terminal.sendText(`clear`);
-    const shell: string | undefined = vscode.workspace
-        .getConfiguration("terminal.integrated.shell")
-        .get("windows");
-    if (process.platform === "win32" && shell && /cmd\.exe$/.test(shell)) {
+    if (process.platform === "win32") {
         // cmd.exe doesn't recognize single quotes
         terminal.sendText(`${racketCmd} "${filePath}"`);
     } else {
+        terminal.sendText("clear");
         terminal.sendText(`${racketCmd} '${filePath}'`);
     }
 }
@@ -56,19 +53,20 @@ export function loadFileInRepl(filePath: string, repl: vscode.Terminal): void {
 }
 
 export function createTerminal(filePath: string | null): vscode.Terminal {
+    const shell = process.platform === "win32" ? "cmd.exe" : undefined;
     let terminal;
     if (filePath) {
         const templateSetting: string | undefined = vscode.workspace
             .getConfiguration("vscode-fracas.outputTerminal")
             .get("outputTerminalTitle");
         const template = templateSetting && templateSetting !== "" ? templateSetting : "Output ($name)";
-        terminal = vscode.window.createTerminal(template.replace("$name", path.basename(filePath)));
+        terminal = vscode.window.createTerminal(template.replace("$name", path.basename(filePath)), shell);
     } else {
         const templateSetting: string | undefined = vscode.workspace
             .getConfiguration("vscode-fracas.outputTerminal")
             .get("sharedOutputTerminalTitle");
         const template = templateSetting && templateSetting !== "" ? templateSetting : "Racket Output";
-        terminal = vscode.window.createTerminal(template);
+        terminal = vscode.window.createTerminal(template, shell);
     }
     terminal.show();
     return terminal;
