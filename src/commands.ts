@@ -185,7 +185,9 @@ export async function formatFracasDocument(
             const fileBytes = new TextEncoder().encode(fracasText.endsWith(newline) ? fracasText : fracasText + newline);
             vscode.workspace.fs.writeFile(vscode.Uri.file(f.path), fileBytes);
             const indent = options?.tabSize ?? 2;
-            const formatCmd = `"${config.getPython()}" "${config.getFormatterScript()}" --diff --indent-size ${indent} ${f.path}`;
+            const indentComments = config.shouldFormatterIndentComments() ? "--indent-comments" : "";
+            const useTabs = options?.insertSpaces ? "" : `--tab ${indent}`;
+            const formatCmd = `"${config.getPython()}" "${config.getFormatterScript()}" --diff --indent-size ${indent} ${indentComments} ${useTabs} ${f.path}`;
             // console.log(fracasText);
             console.log(formatCmd);
             return utils.execShell(formatCmd);
@@ -209,10 +211,13 @@ function _textEditsToDocumentEdits(
     textEdits: vscode.TextEdit[], 
     document: vscode.TextDocument,
     documentPos: vscode.Position, 
-    newline = "\r\n"
+    newline = "\r\n",
+    options?: vscode.FormattingOptions
 ): void {
     // offset the edits by the offset
-    const exprIndent = " ".repeat(documentPos.character);
+    const exprIndent = (options === undefined || options.insertSpaces) ? 
+        " ".repeat(documentPos.character) :
+        "\t".repeat(documentPos.character / options.tabSize) + " ".repeat(documentPos.character % options.tabSize);
     const editRanges = textEdits.map(edit => edit.range);
     // Translate text edit offsets to the position of the selected expression
     const documentRanges = editorLib.textRangesToDocumentRanges(editedText, editRanges, newline, document, documentPos);

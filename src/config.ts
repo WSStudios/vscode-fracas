@@ -127,3 +127,9 @@ export function getPython(): string {
 let yasiScript = "yasi_ws.py"; // the full path isn't known until the extension is activated.
 export function getFormatterScript(): string { return yasiScript; }
 export function setFormatterScript(script: string): void { yasiScript = script; }
+
+export function shouldFormatterIndentComments(): boolean {
+    return vscode.workspace
+        .getConfiguration("vscode-fracas.formatting")
+        .get<boolean>("indentComments") ?? true;
+}

@@ -70,6 +70,7 @@
                 ],
                 "editor.wordSeparators": "()[]{}\",'`;#|:",
                 "editor.tabSize": 2,
+                "editor.comments.insertSpace": false,
                 "editor.formatOnPaste": true,
                 "editor.formatOnSave": true,
                 "editor.formatOnSaveMode": "modifications",
@@ -137,6 +138,12 @@
                     ],
                     "markdownDescription": "Paths to search for Racket collections. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
                     "order": 1
+                },
+                "vscode-fracas.formatting.indentComments": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "If true, comment lines will be indented possibly messing with any deliberate comment layout",
+                    "order": 2
                 },
                 "vscode-fracas.localization.stringTableRegistryFile": {
                     "type": "string",
