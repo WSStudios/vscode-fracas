@@ -3,7 +3,7 @@
     "publisher": "Wonderstorm",
     "displayName": "Fracas",
     "description": "Syntax highlighting, code navigation, document formatting, and REPL support for the Fracas and Racket programming languages",
-    "version": "0.1.17",
+    "version": "0.1.18",
     "enabledApiProposals": [
         "textSearchProvider",
         "findTextInFiles"
