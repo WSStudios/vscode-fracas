@@ -77,7 +77,8 @@ export function createRepl(replKey: string, racketCmd: string): vscode.Terminal 
         .getConfiguration("vscode-fracas.repl")
         .get("replTitle");
     const template = templateSetting ?? "REPL ($name)";
-    const repl = vscode.window.createTerminal(template.replace("$name", replKey));
+    const shell = process.platform === "win32" ? "cmd.exe" : undefined;
+    const repl = vscode.window.createTerminal(template.replace("$name", replKey), shell);
     repl.show();
     repl.sendText(racketCmd);
     return repl;
