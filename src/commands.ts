@@ -185,9 +185,24 @@ export async function formatFracasDocument(
             const fileBytes = new TextEncoder().encode(fracasText.endsWith(newline) ? fracasText : fracasText + newline);
             vscode.workspace.fs.writeFile(vscode.Uri.file(f.path), fileBytes);
             const indent = options?.tabSize ?? 2;
-            const indentComments = config.shouldFormatterIndentComments() ? "--indent-comments" : "";
-            const useTabs = options?.insertSpaces ? "" : `--tab ${indent}`;
-            const formatCmd = `"${config.getPython()}" "${config.getFormatterScript()}" --diff --indent-size ${indent} ${indentComments} ${useTabs} ${f.path}`;
+            const cmd = [
+                `"${config.getPython()}"`,
+                `"${config.getFormatterScript()}"`,
+                "--diff",
+                "--indent-size", indent.toString(),
+                "--default-indent", indent.toString(),
+            ];
+            if (frcDoc?.languageId === 'fracas') {
+                cmd.push("--dialect", "fracas");
+            }
+            if (config.shouldFormatterIndentComments()) {
+                cmd.push("--indent-comments");
+            }
+            if (!options?.insertSpaces) {
+                cmd.push("--tab", indent.toString());
+            }
+            cmd.push(f.path);
+            const formatCmd = cmd.join(" ");
             // console.log(fracasText);
             console.log(formatCmd);
             return utils.execShell(formatCmd);
