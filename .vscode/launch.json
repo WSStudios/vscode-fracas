@@ -6,12 +6,22 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
+			"name": "Yasi: Current File",
+			"type": "python",
+			"request": "launch",
+			"program": "${workspaceFolder}/resources/python/yasi_ws.py",
+			// "args": ["--diff", "--tab", "2", "--indent-comments", "--default-indent", "2", "--dialect", "fracas", "${file}"],
+			"args": ["--no-modify", "--indent-comments", "--default-indent", "2", "--dialect", "fracas", "${file}"],
+			"console": "integratedTerminal",
+			"justMyCode": true
+		},
+		{
 			"name": "Run Extension",
 			"type": "extensionHost",
 			"request": "launch",
 			"args": [
 				"--extensionDevelopmentPath=${workspaceFolder}",
-                "--disable-extensions"
+				"--disable-extensions"
 			],
 			"outFiles": [
 				"${workspaceFolder}/out/**/*.js"
@@ -25,7 +35,7 @@
 			"args": [
 				"--extensionDevelopmentPath=${workspaceFolder}",
 				"--extensionTestsPath=${workspaceFolder}/out/test/suite/index",
-                "--disable-extensions",
+				"--disable-extensions",
 				"${workspaceFolder}/src/test/fixture"
 			],
 			"outFiles": [

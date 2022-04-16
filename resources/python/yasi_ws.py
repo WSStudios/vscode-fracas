@@ -124,7 +124,7 @@ def parse_options(arguments=None):
     # pprint(args.__dict__)
 
     args.dialect = args.dialect.lower()
-    if args.dialect not in ['lisp', 'newlisp', 'clojure', 'scheme', 'all', '']:
+    if args.dialect not in ['lisp', 'newlisp', 'clojure', 'scheme', 'fracas', 'all', '']:
         parser.error("`{0}' is not a recognized dialect".format(args.dialect))
 
     args.backup_dir = os.path.expanduser(args.backup_dir)
@@ -409,7 +409,7 @@ def tabify(text, options):
         return text.replace(tab_equiv, '\t')
 
 
-def pad_leading_whitespace(string, zero_level, blist, options=None):
+def pad_leading_whitespace(string, zero_level, blist, is_closing, options=None):
     """ pad_leading_whitespace(string : str, current_level : int,
                                zero_level : int) -> str
 
@@ -437,14 +437,17 @@ def pad_leading_whitespace(string, zero_level, blist, options=None):
 
     indent_level = zero_level
     if blist:
-        indent_level = blist[-1]['indent_level']
+        if is_closing and opts.dialect == 'fracas':
+            indent_level = blist[-2]['indent_level'] if len(blist) > 1 else zero_level
+        else:
+            indent_level = blist[-1]['indent_level']
 
     padding = ' ' * indent_level
     padding = tabify(padding, opts)
     return padding + string, indent_level
 
 
-def indent_line(zerolevel, bracket_list, line, in_comment, in_symbol_region,
+def indent_line(zerolevel, bracket_list, line, in_comment, in_symbol_region, is_closing,
                 options=None):
     """ indent_line(zerolevel : int, bracket_list : list, line : str, in_comment : bool,
                     in_symbol_region : bool, options : string|list)
@@ -453,10 +456,8 @@ def indent_line(zerolevel, bracket_list, line, in_comment, in_symbol_region,
     locations stored in the list to indent the line.
     """
     opts = parse_options(options)
-    comment_line = re.search('^[ \t]*;', line, re.M)
-    if opts.indent_comments:
-        # We are allowed to indent comment lines
-        comment_line = False
+    # If we are allowed to indent comment lines, disregard whether this line is a comment
+    comment_line = False if opts.indent_comments else re.search('^[ \t]*;', line, re.M)
     if not opts.compact and bracket_list == [] and not in_comment:
         # If nocompact mode is on and there are no unclosed blocks, try to
         # find the zero level by simply counting spaces before a line that
@@ -479,7 +480,7 @@ def indent_line(zerolevel, bracket_list, line, in_comment, in_symbol_region,
         # If the list is empty, then the current_level defaults
         # to zero
         curr_line, current_level = pad_leading_whitespace(line, zerolevel,
-                                                          bracket_list, opts)
+                                                          bracket_list, is_closing, opts)
         return zerolevel, curr_line, current_level
     else:
         return zerolevel, line, 0
@@ -547,6 +548,8 @@ NEWLISP_KEYWORDS = \
      'do-while', 'for-all', 'find-all', 'for'
      ]
 
+FRACAS_KEYWORDS = LISP_KEYWORDS + SCHEME_KEYWORDS + CLOJURE_KEYWORDS + NEWLISP_KEYWORDS
+
 # The 'if' and 'else' part of an if block should have different indent levels so
 # that they can stand out since there's no else Keyword in Lisp/Scheme to make
 # this explicit.  list IF_LIKE helps us track these keywords.
@@ -608,6 +611,8 @@ def add_keywords(opts):
         two_spacers = NEWLISP_KEYWORDS
         two_armed += []
         local_binders += []
+    elif dialect == 'fracas':
+        two_spacers = FRACAS_KEYWORDS
     elif dialect == 'all':
         two_spacers = LISP_KEYWORDS + SCHEME_KEYWORDS + CLOJURE_KEYWORDS + \
             NEWLISP_KEYWORDS
@@ -761,6 +766,9 @@ def _push_to_list(lst, func_name, char, line, offset,
                                                   if not opts.uniform
                                                   else (offset + opts.indent_size))
 
+    # elif func_name == 'list' and opts.dialect == 'fracas':
+    #     if len(lst) > 1:
+    #         pos_hash['indent_level'] = lst[-2]['indent_level'] + opts.indent_size
     elif func_name != '':
         if two_spacer:
             pos_hash['indent_level'] = lead_spaces + offset + opts.indent_size
@@ -859,10 +867,11 @@ def indent_code(original_code, options=None):
         curr_line = line
 
         # Get the indent level and the indented line
+        is_closing = re.match('^\s*[\)\]\}]', curr_line)
         zero_level, curr_line, indent_level = indent_line(zero_level,
                                                           bracket_locations,
                                                           line, in_comment,
-                                                          in_symbol_region, opts)
+                                                          in_symbol_region, is_closing, opts)
         # Build up the indented string.
         indented_code.append(curr_line)
         regex = '^[ \t]*'
