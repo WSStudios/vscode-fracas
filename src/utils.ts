@@ -3,22 +3,34 @@ import * as cp from "child_process";
 import { getProjectDir, getRacket, getRacketShellCmd } from "./config";
 import stream = require("stream");
 
-export function execShell(cmd: string, input?: string, workingDir?: string) : Promise<string> {
+export interface ExecOptions {
+    input?: string;
+    workingDir?: string;
+    showErrors: boolean;
+}
+
+export function execShell(
+    cmd: string,
+    options: ExecOptions = { showErrors: true, workingDir: getProjectDir() }
+) : Promise<string> {
     return new Promise<string>((resolve, reject) => {
         const child = cp.exec(cmd, 
-            { cwd: workingDir ?? getProjectDir() },
+            { cwd: options.workingDir },
             (err, out) => {
                 if (err) {
-                    vscode.window.showErrorMessage(err.message + "\n" + out);
+                    if (options.showErrors) {
+                        vscode.window.showErrorMessage(err.message + "\n" + out);
+                    }
+                    console.error(err);
                     return reject(err);
                 }
                 return resolve(out);
             });
 
         // if an input is given, pipe it to the child process
-        if (input && child.stdin) {
+        if (options.input && child.stdin) {
             const stdinStream = new stream.Readable();
-            stdinStream.push(input);  // Add data to the internal queue for users of the stream to consume
+            stdinStream.push(options.input);  // Add data to the internal queue for users of the stream to consume
             stdinStream.push(null);   // Signals the end of the stream (EOF)
             stdinStream.pipe(child.stdin);            
         }

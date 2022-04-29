@@ -128,11 +128,20 @@ export async function precompileFracasFile(frcDoc: vscode.TextDocument | undefin
         const ninja = config.getNinja();
 
         // Invoke ninja to update all precompiled zo file dependencies
-        console.log(`Precompiling fracas files because ${frcDoc.fileName} has changed`);
         const precompileNinjaFile = path.join("build", "build_precompile.ninja");
+        const projectFolder = config.getProjectFolder();
+        
+        try {
+            // make sure build_precompile.ninja exists. Users with pre-built binaries may not have this file
+            await vscode.workspace.fs.stat(vscode.Uri.joinPath(projectFolder.uri, precompileNinjaFile));
+        } catch {
+            console.log("Skip precompiling because build_precompile.ninja does not exist");
+            return;
+        }
+
         const ninjaCmd = `"${ninja}" -f "${precompileNinjaFile}"`;
-        console.log(ninjaCmd);
-        await utils.execShell(ninjaCmd);
+        console.log(`Precompiling fracas files because ${frcDoc.fileName} has changed: ${ninjaCmd}`);
+        await utils.execShell(ninjaCmd, { workingDir: projectFolder.uri.fsPath, showErrors: false });
     }
 }
 
