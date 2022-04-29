@@ -75,13 +75,13 @@ function _anySymbolRx(symbol: string): string {
 }
 
 function _anyDefineRx(): string {
-    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${RX_CHAR_IDENTIFIER}+)`;
+    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${RX_CHAR_IDENTIFIER}+)(?!${RX_CHARS_CLOSE_PAREN})`;
 }
 
 function _anyDefineSymbolRx(symbol: string, searchKind = SearchKind.wholeMatch): string {
     return searchKind === SearchKind.wholeMatch ?
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${_escapeForRegEx(symbol)})(?!${RX_CHAR_IDENTIFIER})` :
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${_escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)`;
+        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${_escapeForRegEx(symbol)})(?!${RX_CHAR_IDENTIFIER}|${RX_CHARS_CLOSE_PAREN})` :
+        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${_escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)(?!${RX_CHARS_CLOSE_PAREN})`;
 }
 
 function _anyEnumSymbolRx(symbol: string, searchKind = SearchKind.wholeMatch): string {
@@ -799,7 +799,7 @@ export async function findReferences(
     }
     
     const symbol = getSelectedSymbol(referencingDocument, referencingPosition);
-        // Do a dumb search for all text matching the symbol
+    // Do a dumb search for all text matching the symbol
     const symbolRx = _anySymbolRx(symbol);
     const results = await findTextInFiles(symbolRx, token);
 
