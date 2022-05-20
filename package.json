@@ -62,7 +62,15 @@
                 "editor.rulers": [
                     102
                 ],
-                "editor.wordSeparators": "()[]{}\",'`;#|:"
+                "editor.wordSeparators": "()[]{}\",'`;#|:",
+                "editor.tabSize": 2,
+                "editor.comments.insertSpace": false,
+                "editor.formatOnPaste": true,
+                "editor.guides.bracketPairs": true,
+                "editor.guides.bracketPairsHorizontal": true,
+                "editor.guides.highlightActiveBracketPair": true,
+                "editor.autoClosingOvertype": "auto",
+                "editor.bracketPairColorization.enabled": true
             },
             "[fracas]": {
                 "editor.rulers": [
