@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { getProjectFolder } from './config';
 
 export function withEditor(func: (vscodeEditor: vscode.TextEditor) => void): void {
     const editor = vscode.window.activeTextEditor;
@@ -21,7 +22,7 @@ export function getRange(ranges: (vscode.Range | vscode.Range[])): vscode.Range 
 export async function findTextInFiles(
     searchRx: string,
     token?: vscode.CancellationToken,
-    include: vscode.GlobPattern = '**/*.frc'
+    include: vscode.GlobPattern = new vscode.RelativePattern(getProjectFolder(), '**/*.frc')
 ): Promise<vscode.TextSearchMatch[]> {
     console.log(searchRx);
     const results: vscode.TextSearchMatch[] = [];
