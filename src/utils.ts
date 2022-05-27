@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as cp from "child_process";
-import { getProjectDir, getRacket, getRacketShellCmd } from "./config";
+import { fracasOut, getProjectDir, getRacket, getRacketShellCmd } from "./config";
 import stream = require("stream");
 
 export interface ExecOptions {
@@ -13,6 +13,8 @@ export function execShell(
     cmd: string,
     options: ExecOptions = { showErrors: true, workingDir: getProjectDir() }
 ) : Promise<string> {
+    fracasOut.appendLine(`From working dir: '${options.workingDir}'`);
+    fracasOut.appendLine(`Executing: '${cmd}'`);
     return new Promise<string>((resolve, reject) => {
         const child = cp.exec(cmd, 
             { cwd: options.workingDir },
@@ -21,7 +23,11 @@ export function execShell(
                     if (options.showErrors) {
                         vscode.window.showErrorMessage(err.message + "\n" + out);
                     }
-                    console.error(err);
+                    fracasOut.appendLine(`Command failed '${cmd}':`);
+                    fracasOut.appendLine(`${err.name}: ${err.message}`);
+                    if (err.stack) {
+                        fracasOut.appendLine(err.stack);
+                    }
                     return reject(err);
                 }
                 return resolve(out);

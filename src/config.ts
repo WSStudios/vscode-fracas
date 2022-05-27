@@ -14,6 +14,8 @@ const kOsUe4Name =
     'Win64';
 const kOsBinExt = kOsType === 'Windows_NT' ? '.exe' : '';
 
+export const fracasOut = vscode.window.createOutputChannel("Fracas");
+
 export function getProjectFolder(): vscode.WorkspaceFolder {
     const projectDir = vscode.workspace
         .getConfiguration("vscode-fracas.general")

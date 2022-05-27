@@ -4,6 +4,7 @@ import { LanguageClient, LanguageClientOptions } from "vscode-languageclient/nod
 import * as com from "./commands";
 import * as ue4 from "./ue4";
 import {
+    fracasOut,
     loadProjectConfig,
     setFormatterScript,
     watchProjectConfig
@@ -55,7 +56,7 @@ function setupLSP() {
             },
         };
 
-        console.log(`Starting language server with ${executable.command} ${executable.args.join(" ")}`);
+        fracasOut.appendLine(`Starting language server with ${executable.command} ${executable.args.join(" ")}`);
 
         // Create the language client and start the client.
         langClient = new LanguageClient(

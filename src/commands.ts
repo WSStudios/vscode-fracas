@@ -89,7 +89,7 @@ export async function makeStringTableImport(): Promise<void> {
             return csvFile;
         });
 
-        console.log(`Generating ${textFrcFiles.length} text source files into "${stringTableCpp}"`);
+        config.fracasOut.appendLine(`Generating ${textFrcFiles.length} text source files into "${stringTableCpp}"`);
         await utils.execShell(`${racket} ../fracas/lib/fracas/make-string-table-import.rkt -- ${csvFiles.join(" ")}`);
     }
 }
@@ -135,12 +135,12 @@ export async function precompileFracasFile(frcDoc: vscode.TextDocument | undefin
             // make sure build_precompile.ninja exists. Users with pre-built binaries may not have this file
             await vscode.workspace.fs.stat(vscode.Uri.joinPath(projectFolder.uri, precompileNinjaFile));
         } catch {
-            console.log("Skip precompiling because build_precompile.ninja does not exist");
+            config.fracasOut.appendLine("Skip precompiling because build_precompile.ninja does not exist");
             return;
         }
 
         const ninjaCmd = `"${ninja}" -f "${precompileNinjaFile}"`;
-        console.log(`Precompiling fracas files because ${frcDoc.fileName} has changed: ${ninjaCmd}`);
+        config.fracasOut.appendLine(`Precompiling fracas files because ${frcDoc.fileName} has changed: ${ninjaCmd}`);
         await utils.execShell(ninjaCmd, { workingDir: projectFolder.uri.fsPath, showErrors: false });
     }
 }
@@ -213,7 +213,7 @@ export async function formatFracasDocument(
             cmd.push(f.path);
             const formatCmd = cmd.join(" ");
             // console.log(fracasText);
-            console.log(formatCmd);
+            config.fracasOut.appendLine(formatCmd);
             return utils.execShell(formatCmd);
         });
 

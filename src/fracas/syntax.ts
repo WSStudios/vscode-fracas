@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { getProjectFolder } from '../config';
+import { fracasOut, getProjectFolder } from '../config';
 import { flatten, mapAsync, uniqBy } from '../containers';
 import { 
     findTextInFiles, 
@@ -640,7 +640,7 @@ async function _findDefinition(
 ): Promise<FracasDefinition[]> {
     // search for an explicit define-xxx matching the token, e.g., given "module-db" find "(define-type module-db"
     const textMatches = await findTextInFiles(defineRxStr, token);
-    console.debug(`Found ${textMatches.length} matches for ${defineRxStr}`);
+    fracasOut.appendLine(`Found ${textMatches.length} matches for ${defineRxStr}`);
     const defs = await mapAsync(textMatches, async textMatch => {
         // extract the symbol name substring, e.g. get "range-int" from "(define-type range-int"
         const rxMatch = new RegExp(defineRxStr).exec(textMatch.preview.text);
@@ -649,7 +649,7 @@ async function _findDefinition(
             const location = await regexGroupUriLocation(textMatch.uri, rxMatch, getRange(textMatch.ranges).start, 2);
             return new FracasDefinition(location, symbol, definitionKind(defToken));
         } else {
-            console.warn(`Failed to extract symbol name from ${textMatch.preview.text} using regex '${defineRxStr}'. An engineer should check that the regex is correct.`);
+            vscode.window.showErrorMessage(`Failed to extract symbol name from ${textMatch.preview.text} using regex '${defineRxStr}'. An engineer should check that the regex is correct.`);
             const location = new vscode.Location(textMatch.uri, getRange(textMatch.ranges));
             return new FracasDefinition(location, textMatch.preview.text, definitionKind("define"));
         }
@@ -933,7 +933,7 @@ async function _findCompletionsNonUnique(
 
         const keywordCompletions = await _toCompletionItems(
             keywordDefs, KEYWORD_PREFIX, resolvedSymbol.range);
-        console.debug(`Found ${keywordCompletions.length} keywords for ${symbol}`);
+        fracasOut.appendLine(`Found ${keywordCompletions.length} keywords for ${symbol}`);
         return keywordCompletions;
     } 
 
@@ -961,14 +961,14 @@ async function _findCompletionsNonUnique(
         return optionCompletions;
     }));
 
-    console.debug(`Found ${typeDefs.length} types and ${variantOptionCompletions.length} variant options for ${symbol}`);
+    fracasOut.appendLine(`Found ${typeDefs.length} types and ${variantOptionCompletions.length} variant options for ${symbol}`);
     completionItems.push(...typeCompletions);
     completionItems.push(...variantOptionCompletions);
 
     // find variant options matching the symbol, e.g. targeting-gather-sa => targeting-gather-saved-actor
     const variantOptions = await findVariantOptionDefinition(symbol, token, SearchKind.partialMatch);
     const variantCompletions = await _toCompletionItems(variantOptions, '', resolvedSymbol.range);
-    console.debug(`Found ${variantOptionCompletions.length} variant options for ${symbol}`);
+    fracasOut.appendLine(`Found ${variantOptionCompletions.length} variant options for ${symbol}`);
 
     completionItems.push(...variantCompletions);
     return completionItems;

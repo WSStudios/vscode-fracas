@@ -1,5 +1,6 @@
 import * as http from 'http';
 import * as vscode from "vscode";
+import { fracasOut } from './config';
 
 export function ue4GetSelectedAssetPaths(): string[] {
     // if no assetPath is provided, use the current selection
@@ -69,7 +70,7 @@ export async function ue4RemoteObjectCall(objectPath: string, functionName: stri
 
     let responseData = '';
     const req = http.request(options, res => {
-        console.log(`${functionName} statusCode: ${res.statusCode}`);
+        fracasOut.appendLine(`${functionName} statusCode: ${res.statusCode}`);
         res.on('data', function(d) { responseData = d.toString(); });
     });
 

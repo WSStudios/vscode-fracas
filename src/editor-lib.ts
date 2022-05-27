@@ -1,6 +1,9 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { getProjectFolder } from './config';
+import { 
+    fracasOut,
+    getProjectFolder
+} from './config';
 
 export function withEditor(func: (vscodeEditor: vscode.TextEditor) => void): void {
     const editor = vscode.window.activeTextEditor;
@@ -24,13 +27,14 @@ export async function findTextInFiles(
     token?: vscode.CancellationToken,
     include: vscode.GlobPattern = new vscode.RelativePattern(getProjectFolder(), '**/*.frc')
 ): Promise<vscode.TextSearchMatch[]> {
-    console.log(searchRx);
+    fracasOut.appendLine(searchRx);
     const results: vscode.TextSearchMatch[] = [];
     try {
         await vscode.workspace.findTextInFiles(
             { pattern: searchRx, isRegExp: true },
             {
                 include: include,
+                afterContext: 1,
                 previewOptions: {
                     matchLines: 1,
                     charsPerLine: 100
@@ -44,7 +48,7 @@ export async function findTextInFiles(
             },
             token);
     } catch (error) {
-        console.error(error);
+        vscode.window.showErrorMessage("Text search failed: " + error);
     }
     return results;
 }
@@ -60,7 +64,7 @@ export function getSelectedSymbol(
         }
         return word;
     } else {
-        console.error("Tried to search for definition, but no text was highlighted nor could a phrase be determined from cursor position");
+        fracasOut.appendLine("Tried to search for definition, but no text was highlighted nor could a phrase be determined from cursor position");
         return "";
     }
 }
