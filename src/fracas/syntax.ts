@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { getProjectFolder } from '../config';
 import { flatten, mapAsync, uniqBy } from '../containers';
 import { 
     findTextInFiles, 
@@ -6,7 +7,9 @@ import {
     getSelectedSymbol, 
     regexGroupDocumentLocation, 
     regexGroupUriLocation, 
+    resolvePosition, 
     resolveRange, 
+    resolveSelection, 
     resolveSymbol, 
     searchBackward 
 } from '../editor-lib';
@@ -34,6 +37,7 @@ export enum FracasDefinitionKind {
     syntax,
     define,
     keyword,
+    import,
     unknown
 }
 
@@ -104,6 +108,10 @@ const ENUM_MEMBER_RX = new RegExp(_enumMemberRx());
 
 function _anyConstructorRx(): string {
     return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_CHAR_IDENTIFIER}+):`;
+}
+
+function _importRx(): string {
+    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*import(\\+export)?`;
 }
 
 function _anyFieldSymbolDeclarationRx(fieldName: string, searchKind = SearchKind.wholeMatch): string {
@@ -189,6 +197,9 @@ export function definitionKind(defToken: string): FracasDefinitionKind {
             return FracasDefinitionKind.define;
         case 'define-list':
             return FracasDefinitionKind.define;
+        case 'import':
+        case 'import+export':
+            return FracasDefinitionKind.import;
         default:
             return FracasDefinitionKind.unknown;
     }
@@ -231,6 +242,8 @@ export function completionKind(fracasKind: FracasDefinitionKind): vscode.Complet
             return vscode.CompletionItemKind.Function;
         case (FracasDefinitionKind.keyword):
             return vscode.CompletionItemKind.Keyword;
+        case (FracasDefinitionKind.import):
+            return vscode.CompletionItemKind.Module;
         case (FracasDefinitionKind.unknown):
         default:
             return vscode.CompletionItemKind.Unit;
@@ -261,6 +274,8 @@ export function symbolKind(fracasKind: FracasDefinitionKind): vscode.SymbolKind 
             return vscode.SymbolKind.Function;
         case (FracasDefinitionKind.keyword):
             return vscode.SymbolKind.Field;
+        case (FracasDefinitionKind.import):
+            return vscode.SymbolKind.File;
         case (FracasDefinitionKind.unknown):
         default:
             return vscode.SymbolKind.Null;
@@ -285,6 +300,7 @@ export function symbolKind(fracasKind: FracasDefinitionKind): vscode.SymbolKind 
 function _memberScopeDepth(fracasKind: FracasDefinitionKind): vscode.CompletionItemKind {
     switch (fracasKind) {
         case (FracasDefinitionKind.define):
+        case (FracasDefinitionKind.import):
             return 0;
         case (FracasDefinitionKind.syntax):
         case (FracasDefinitionKind.variant):
@@ -578,6 +594,18 @@ export async function isWithinVariant(
         && fracasDef.symbol === variantName;
 }
 
+export function isWithinImport(document: vscode.TextDocument, pos: vscode.Position
+): boolean {
+    const openParen = findOpenBracket(document, pos);
+    if (!openParen) {
+        return false;
+    }
+
+    const searchRx = new RegExp(_importRx());
+    const result = searchRx.exec(document.getText(new vscode.Range(openParen, pos)));
+    return !!result;
+}
+
 export async function findSymbolDefinition(
     typeName: string,
     token?: vscode.CancellationToken,
@@ -665,26 +693,48 @@ export async function findVariantOptionDefinition(
     return variantDefs.filter(x => x !== undefined) as FracasDefinition[];
 }
 
+export async function findImportDefinition(
+    document: vscode.TextDocument,
+    position: vscode.Position,
+    importSymbol: string
+): Promise<FracasDefinition | undefined> {
+    if (!isWithinImport(document, position)) {
+        return undefined;
+    }
+
+    const importPath = importSymbol.startsWith("fracas/") ? importSymbol : "fracas/" + importSymbol;
+    const importedUri = vscode.Uri.joinPath(getProjectFolder().uri, importPath + ".frc");
+    try {
+        // make sure imported file exists
+        await vscode.workspace.fs.stat(importedUri);
+        const importDef = new FracasDefinition(
+            new vscode.Location(importedUri, new vscode.Position(0, 0)),
+            importSymbol, FracasDefinitionKind.import);
+    
+        return importDef;
+    } catch {
+        return undefined;
+    }
+}
+
 export async function findKeywordDefinition(
     referencingDocument?: vscode.TextDocument,
     documentSelection?: vscode.Range,
     token?: vscode.CancellationToken,
     searchKind: SearchKind = SearchKind.wholeMatch
 ): Promise<FracasDefinition[]> {
-    const activeEditor = vscode.window.activeTextEditor;
-    referencingDocument = referencingDocument ?? activeEditor?.document;
-    documentSelection = documentSelection ?? activeEditor?.selection;
-    if (!referencingDocument || !documentSelection) {
+    const { document, selection } = resolveSelection(referencingDocument, documentSelection);
+    if (!document || !selection) {
         return [];
     }
 
-    const keyword = getSelectedSymbol(referencingDocument, documentSelection);
+    const keyword = getSelectedSymbol(document, selection);
     if (!keyword.startsWith(KEYWORD_PREFIX)) {
         return [];
     }
 
     // find the constructor in which this field is declared
-    const constructorMatch = await findEnclosingConstructor(referencingDocument, documentSelection.start);
+    const constructorMatch = await findEnclosingConstructor(document, selection.start);
     if (!constructorMatch) {
         return [];
     }
@@ -710,16 +760,14 @@ export async function findEnumOrMaskMembers(
     token?: vscode.CancellationToken,
     searchKind: SearchKind = SearchKind.wholeMatch
 ): Promise<FracasDefinition[]> {
-    const activeEditor = vscode.window.activeTextEditor;
-    referencingDocument = referencingDocument ?? activeEditor?.document;
-    documentPosition = documentPosition ?? activeEditor?.selection?.active;
-    if (!referencingDocument || !documentPosition) {
+    const { document, position } = resolvePosition(referencingDocument, documentPosition);
+    if (!document || !position) {
         return [];
     }
 
     // if the symbol is the beginning of (mask foo thing... or (enum bar thing...
     // then try to auto-complete from the enum/mask definition
-    const enclosingEnum = await findEnclosingEnumOrMask(referencingDocument, documentPosition);
+    const enclosingEnum = await findEnclosingEnumOrMask(document, position);
     if (!enclosingEnum) {
         return [];
     }
@@ -767,6 +815,12 @@ export async function findDefinition(
     // git the symbol at the cursor
     const symbol = getSelectedSymbol(document, position, true);
 
+    // if the cursor is within an (import ... ) statement, find the source document
+    const importDef = await findImportDefinition(document, position, symbol);
+    if (importDef) {
+        return [importDef];
+    }
+
     // if the cursor is within a (mask ...) or (enum ...) declaration, search for matching enum members
     const enumMembers = await findEnumOrMaskMembers(document, position, symbol, token, searchKind);
     if (enumMembers.length > 0) {
@@ -788,24 +842,22 @@ export async function findDefinition(
 
 export async function findReferences(
     referencingDocument?: vscode.TextDocument,
-    referencingPosition?: vscode.Position,
+    documentPosition?: vscode.Position,
     token?: vscode.CancellationToken
 ): Promise<vscode.Location[]> {
-    const activeEditor = vscode.window.activeTextEditor;
-    referencingDocument = referencingDocument ?? activeEditor?.document;
-    referencingPosition = referencingPosition ?? activeEditor?.selection.anchor;
-    if (!referencingDocument || !referencingPosition) {
+    const { document, position } = resolvePosition(referencingDocument, documentPosition);
+    if (!document || !position) {
         return [];
     }
     
-    const symbol = getSelectedSymbol(referencingDocument, referencingPosition);
+    const symbol = getSelectedSymbol(document, position);
     // Do a dumb search for all text matching the symbol
     const symbolRx = _anySymbolRx(symbol);
     const results = await findTextInFiles(symbolRx, token);
 
     // if the symbol is part of a variant, search for the full variant option name. E.g. if the cursor is
     // on (combat-focus ()) within (define-variant targeting-gather ...), search for "targeting-gather-combat-focus"
-    const fracasDef = await findEnclosingDefine(referencingDocument.uri, referencingPosition);
+    const fracasDef = await findEnclosingDefine(document.uri, position);
     if (fracasDef?.kind === FracasDefinitionKind.variant) {
         const variantOption = `${fracasDef.symbol}-${symbol}`;
         const variantResults = await findTextInFiles(_anySymbolRx(variantOption), token);

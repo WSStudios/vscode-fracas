@@ -98,7 +98,7 @@ export function resolveSymbol(
         // default to the word under the cursor if no range is provided
         if (range?.isEmpty) {
             const wordRange = document.getWordRangeAtPosition(
-                range?.start ?? where as vscode.Position, /[#:\w\-+*.>]+/);
+                range?.start ?? where as vscode.Position, /[#:\w\-+*.>/]+/);
             if (wordRange) {
                 range = wordRange;
             }
@@ -111,6 +111,28 @@ export function resolveSymbol(
     }
 
     return undefined;
+}
+
+export function resolveSelection(
+    referencingDocument?: vscode.TextDocument,
+    documentSelection?: vscode.Range,
+): { document: vscode.TextDocument | undefined, selection: vscode.Range | undefined } {
+    const activeEditor = vscode.window.activeTextEditor;
+    return { 
+        document: referencingDocument ?? activeEditor?.document,
+        selection: documentSelection ?? activeEditor?.selection
+    };
+}
+
+export function resolvePosition(
+    referencingDocument?: vscode.TextDocument,
+    documentPosition?: vscode.Position,
+): { document: vscode.TextDocument | undefined, position: vscode.Position | undefined } {
+    const activeEditor = vscode.window.activeTextEditor;
+    return { 
+        document: referencingDocument ?? activeEditor?.document,
+        position: documentPosition ?? activeEditor?.selection?.active
+    };
 }
 
 /**
