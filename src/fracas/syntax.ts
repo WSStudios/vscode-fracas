@@ -1,3 +1,4 @@
+import path = require('path');
 import * as vscode from 'vscode';
 import { fracasOut, getProjectFolder } from '../config';
 import { flatten, mapAsync, uniqBy } from '../containers';
@@ -86,6 +87,10 @@ function _anyDefineSymbolRx(symbol: string, searchKind = SearchKind.wholeMatch):
     return searchKind === SearchKind.wholeMatch ?
         `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${_escapeForRegEx(symbol)})(?!${RX_CHAR_IDENTIFIER}|${RX_CHARS_CLOSE_PAREN})` :
         `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${_escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)(?!${RX_CHARS_CLOSE_PAREN})`;
+}
+
+function _definePartialSymbolRx(symbol: string): string {
+    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${RX_CHAR_IDENTIFIER}*${_escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)(?!${RX_CHARS_CLOSE_PAREN})`;
 }
 
 function _anyEnumSymbolRx(symbol: string, searchKind = SearchKind.wholeMatch): string {
@@ -872,22 +877,36 @@ export async function findReferences(
 
 export async function findDocumentSymbols(
     uri: vscode.Uri, token?: vscode.CancellationToken
-): Promise<vscode.DocumentSymbol[]> {
-    const defineRxStr = _anyDefineRx();
+): Promise<vscode.SymbolInformation[]> {
+    return _findSymbols(undefined, uri, token);
+}
+
+export async function findWorkspaceSymbols(
+    symbol: string,
+    token?: vscode.CancellationToken
+): Promise<vscode.SymbolInformation[]> {
+    return _findSymbols(symbol, undefined, token);
+}
+
+async function _findSymbols(
+    symbol?: string, uri?: vscode.Uri, token?: vscode.CancellationToken
+): Promise<vscode.SymbolInformation[]> {
+    const defineRxStr = symbol ? _definePartialSymbolRx(symbol) : _anyDefineRx();
     const defineRx = new RegExp(defineRxStr);
-    const textMatches = await findTextInFiles(defineRxStr, token, uri.fsPath);
-    const symbols = textMatches.map(searchMatch => {
-        const rxMatch = defineRx.exec(searchMatch.preview.text);
-        const [_, defToken, typeName] = rxMatch ?? [undefined, undefined, searchMatch.preview.text];
-        const symbol = new vscode.DocumentSymbol(
-            typeName ?? 'unknown',
-            searchMatch.preview.text,
-            symbolKind(definitionKind(defToken ?? 'define')),
-            getRange(searchMatch.ranges),
-            getRange(searchMatch.ranges)
-        );
-        return symbol;
-    });
+    const textMatches = await findTextInFiles(defineRxStr, token, uri?.fsPath);
+    const symbols = textMatches
+        .filter(searchMatch => searchMatch?.preview?.text !== undefined)
+        .map(searchMatch => {
+            const rxMatch = defineRx.exec(searchMatch.preview.text);
+            const [_, defToken, typeName] = rxMatch ?? [undefined, undefined, searchMatch.preview.text];
+            const symbol = new vscode.SymbolInformation(
+                typeName ?? 'unknown',
+                symbolKind(definitionKind(defToken ?? 'define')),
+                path.basename(searchMatch.uri.path),
+                new vscode.Location(searchMatch.uri, getRange(searchMatch.ranges))
+            );
+            return symbol;
+        });
     return symbols;
 }
 

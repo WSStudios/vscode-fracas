@@ -27,7 +27,7 @@ export async function findTextInFiles(
     token?: vscode.CancellationToken,
     include: vscode.GlobPattern = new vscode.RelativePattern(getProjectFolder(), '**/*.frc')
 ): Promise<vscode.TextSearchMatch[]> {
-    fracasOut.appendLine(searchRx);
+    fracasOut.appendLine(`${include}: ${searchRx}`);
     const results: vscode.TextSearchMatch[] = [];
     try {
         await vscode.workspace.findTextInFiles(

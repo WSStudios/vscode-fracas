@@ -14,7 +14,7 @@ import { FracasCompletionItemProvider } from './fracas/completion-item-provider'
 import { FracasDefinitionProvider } from './fracas/definition-provider';
 import { fracasDocumentFilter } from "./fracas/document-filter";
 import { FracasReferenceProvider } from "./fracas/reference-provider";
-import { FracasDocumentSymbolProvider } from "./fracas/document-symbol-provider";
+import { FracasDocumentSymbolProvider } from "./fracas/symbol-provider";
 import { FracasHoverProvider } from "./fracas/hover-provider";
 import { FracasDocumentFormattingEditProvider } from "./fracas/document-formatting-edit-provider";
 
@@ -145,8 +145,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.languages.registerDefinitionProvider(fracasDocumentFilter, new FracasDefinitionProvider()));
     context.subscriptions.push(
         vscode.languages.registerReferenceProvider(fracasDocumentFilter, new FracasReferenceProvider()));
+    const fracasSymbolProvider = new FracasDocumentSymbolProvider();
     context.subscriptions.push(
-        vscode.languages.registerDocumentSymbolProvider(fracasDocumentFilter, new FracasDocumentSymbolProvider()));
+        vscode.languages.registerDocumentSymbolProvider(fracasDocumentFilter, fracasSymbolProvider));
+    context.subscriptions.push(
+        vscode.languages.registerWorkspaceSymbolProvider(fracasSymbolProvider));
     context.subscriptions.push(
         vscode.languages.registerHoverProvider(fracasDocumentFilter, new FracasHoverProvider()));
     context.subscriptions.push(
