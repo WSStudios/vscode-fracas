@@ -34,7 +34,6 @@ export async function findTextInFiles(
             { pattern: searchRx, isRegExp: true },
             {
                 include: include,
-                afterContext: 1,
                 previewOptions: {
                     matchLines: 1,
                     charsPerLine: 100
