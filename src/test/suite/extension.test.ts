@@ -4,6 +4,7 @@ import path = require("path");
 // You can import and use all API from the 'vscode' module
 // as well as import your extension to test it
 import * as vscode from "vscode";
+import { getProjectDir } from "../../config";
 import { getSelectedSymbol } from "../../editor-lib";
 import { 
     findCompletions,
@@ -21,7 +22,7 @@ async function showFracasDocument(
     return { document, editor };
 }
 
-const testFixtureDir = (vscode.workspace.workspaceFolders ?? [])[0].uri.fsPath;
+const testFixtureDir = getProjectDir();
 const rewardFrc = path.join(testFixtureDir, 'reward.frc');
 const factionsFrc = path.join(testFixtureDir, 'factions.frc');
 const collisionDefinesFrc = path.join(testFixtureDir, 'collision-defines.frc');
@@ -47,7 +48,7 @@ suite("Editor Lib Tests", () => {
 
 suite("Find Definition Tests", () => {
     vscode.window.showInformationMessage("Start findDefinition tests.");
-
+    
     test("findDefinition resolves a named parameter", async () => {
         const { document } = await showFracasDocument(abilityFrc);
         const defs: FracasDefinition[] = await findDefinition(document, new vscode.Position(42, 38)); // cursor within "#:net-playback-mode"

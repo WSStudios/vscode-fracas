@@ -17,14 +17,21 @@ const kOsBinExt = kOsType === 'Windows_NT' ? '.exe' : '';
 export const fracasOut = vscode.window.createOutputChannel("Fracas");
 
 export function getProjectFolder(): vscode.WorkspaceFolder {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders) {
+        throw vscode.FileSystemError.FileNotFound(`No workspace folders found.`);
+    }
+
     const projectDir = vscode.workspace
         .getConfiguration("vscode-fracas.general")
         .get<string>("projectWorkspaceFolder") ?? ".";
-    const folder = vscode.workspace.workspaceFolders?.find(folder => folder.name === projectDir);
-    if (!folder) {
-        throw vscode.FileSystemError.FileNotFound(`Project folder ${projectDir} not found.`);
+    const folder = folders.find(folder => folder.name === projectDir);
+    if (folder) {
+        return folder;
+    } else {
+        vscode.window.showWarningMessage(`Could not find Fracas project folder ${projectDir}. Defaulting to ${folders[0].name}.`);
+        return folders[0];
     }
-    return folder;
 }
 
 export function getProjectDir(): string {
