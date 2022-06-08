@@ -191,61 +191,6 @@ export function textRangesToDocumentRanges(
     return documentRanges;
 }
 
-function _textSubstringsToDocumentLocations(
-    document: vscode.TextDocument,
-    documentTextPosition: vscode.Position,
-    text: string,
-    substrings: { start: number, length: number }[]
-): vscode.Location[] {
-    // convert start/length pairs to indices within the text block
-    const textIndices = [];
-    for (const substring of substrings) {
-        textIndices.push(substring.start, substring.start + substring.length);
-    }
-
-    // convert indices into offsets
-    const textOffsets = _textIndicesToOffsets(textIndices, text);
-
-    // translate the text offsets to document positions
-    const documentLocations = [];
-    const docPosOffset = document.offsetAt(documentTextPosition);
-    for (let i = 0; i < substrings.length; ++i) {
-        const docStart = document.positionAt(docPosOffset + textOffsets[2 * i]);
-        const docEnd = document.positionAt(docPosOffset + textOffsets[2 * i + 1]);
-        const range = new vscode.Range(docStart, docEnd);
-        documentLocations.push(new vscode.Location(document.uri, range));
-    }
-
-    return documentLocations;
-}
-
-/**
- * Convert indices into a block of text into equivalent document offsets. VS code
- * document offsets are based on line number and character index within the line, which
- * ignores multiple-character newlines such as CRLF. This function corrects the newline
- * length overages in the pure character index.
- * @param indices An array of indices into the text string.
- * @param text The string to which the indices refer.
- * @returns An array of offsets equivalent to the indices array.
- */
-function _textIndicesToOffsets(indices: number[], text: string): number[] {
-    const offsets = [];
-    let offset = 0;
-    let character = 0;
-    for (const index of indices) {
-        while (character < index) {
-            // if (text[character] !== '\r') { // VS code document offsets ignore carriage returns.
-                offset += 1;
-            // }
-            character += 1;
-        }
-
-        offsets.push(offset);
-    }
-
-    return offsets;
-}
-
 /**
  * Find the first occurrence of a regex match within a document starting at the given position.
  * @param uri The document to search
@@ -312,17 +257,6 @@ export async function searchBackward(uri: vscode.Uri, pos: vscode.Position, sear
  * @param searchPosition The starting position of the text matched against the regex.
  * @returns The location of the capture group within the document.
  */
-// export function regexGroupDocumentLocation(
-//     document: vscode.TextDocument,
-//     match: RegExpExecArray,
-//     matchPosition: vscode.Position,
-//     group: number
-// ): vscode.Location {
-//     // calculate the offset of the regex group within the match
-//     const locations = _textSubstringsToDocumentLocations(
-//         document, matchPosition, match.input, [{ start: match.index, length: match[group].length }]);
-//     return locations[0];
-// }
 export function regexGroupDocumentLocation(
     match: RegExpExecArray,
     group: number,
@@ -447,25 +381,6 @@ function _lastMatch(searchRx: RegExp, text: string): RegExpExecArray | null {
  * @param range The range of document text within which to search for matches. Defaults to the entire document.
  * @returns locations of matches initialized with the document URI and the range of the extracted capture group.
  */
-// export function matchAll(
-//     searchRx: RegExp, 
-//     document: vscode.TextDocument,
-//     group: number,
-//     range?: vscode.Range
-// ): vscode.Location[] {
-//     // find regex match indices in the text
-//     const text = document.getText(range);
-//     const substrings = [];
-//     for (let match = searchRx.exec(text); match; match = searchRx.global ? searchRx.exec(text) : null) {
-//         substrings.push({ start: match.index, length: match[group].length });
-//     }
-
-//     // convert text indices into document locations
-//     const documentTextPosition = range?.start ?? new vscode.Position(0, 0);
-//     const locations = _textSubstringsToDocumentLocations(document, documentTextPosition, text, substrings);
-
-//     return locations;
-// }
 export function matchAll(
     searchRx: RegExp, 
     document: vscode.TextDocument,
