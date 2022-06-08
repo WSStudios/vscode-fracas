@@ -12,7 +12,6 @@ module.exports = {
     "prettier",
   ],
   parserOptions: {
-    ecmaVersion: 6,
     sourceType: "module",
   },
   plugins: ["prettier", "@typescript-eslint"],
@@ -31,5 +30,6 @@ module.exports = {
   ignorePatterns: ["out", "dist", "**/*.d.ts"],
   env: {
     node: true,
+    es2020: true
   },
 };
