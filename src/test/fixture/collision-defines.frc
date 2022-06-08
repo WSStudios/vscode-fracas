@@ -1,8 +1,9 @@
 #lang fracas
 
 (import
- (utils ws-math)
+ fracas/utils/ws-math
 
+; some/ignored/import
  unreal-defines
  )
 

@@ -7,6 +7,7 @@ import * as vscode from "vscode";
 import { getProjectDir } from "../../config";
 import { getSelectedSymbol } from "../../editor-lib";
 import { 
+    findAllImportDefinitions,
     findCompletions,
     findDefinition,
     FracasDefinition, 
@@ -46,6 +47,16 @@ suite("Editor Lib Tests", () => {
     });
 });
 
+suite("Import Tests", () => {
+    vscode.window.showInformationMessage("Start import tests.");
+
+    test("findAllImportDefinitions finds the correct imports", async () => {
+        const { document, editor } = await showFracasDocument(collisionDefinesFrc);
+        const imports = findAllImportDefinitions(document);
+        const importSymbols = imports.map(i => i.symbol);
+        assert.deepStrictEqual(importSymbols, ["fracas/utils/ws-math", "unreal-defines"] );
+    });
+});
 suite("Find Definition Tests", () => {
     vscode.window.showInformationMessage("Start findDefinition tests.");
     
@@ -112,18 +123,18 @@ suite("Find Definition Tests", () => {
         assert.strictEqual(defs[0].completionKind, vscode.CompletionItemKind.Enum, "type completion kind is not 'Enum'");
         assert.strictEqual(defs[0].symbol, "phys-collision-channel");
         assert.strictEqual(defs[0].location.uri.fsPath, collisionDefinesFrc);
-        assert.deepStrictEqual(defs[0].location.range, new vscode.Range(37, 13, 37, 35), "location of mask type is not correct");
+        assert.deepStrictEqual(defs[0].location.range, new vscode.Range(38, 13, 38, 35), "location of mask type is not correct");
     });
 
     test("findDefinition resolves a mask member at scope depth 1", async () => {
         const { document } = await showFracasDocument(collisionDefinesFrc);
-        const defs: FracasDefinition[] = await findDefinition(document, new vscode.Position(73, 79)); // cursor within "destructible"
+        const defs: FracasDefinition[] = await findDefinition(document, new vscode.Position(74, 79)); // cursor within "destructible"
         assert.strictEqual(defs.length, 1, "single definition not found");
         assert.strictEqual(defs[0].kind, FracasDefinitionKind.maskMember, "type definition kind is not 'maskMember'");
         assert.strictEqual(defs[0].completionKind, vscode.CompletionItemKind.EnumMember, "type completion kind is not 'EnumMember'");
         assert.strictEqual(defs[0].symbol, "destructible");
         assert.strictEqual(defs[0].location.uri.fsPath, collisionDefinesFrc);
-        assert.deepStrictEqual(defs[0].location.range, new vscode.Range(46, 3, 46, 15), "location of mask member is not correct");
+        assert.deepStrictEqual(defs[0].location.range, new vscode.Range(47, 3, 47, 15), "location of mask member is not correct");
     });
 
     test("findDefinition resolves a field def", async () => {
@@ -176,7 +187,7 @@ suite("Auto-Completion Tests", () => {
 
     test("findCompletions resolves all mask members for empty text", async () => {
         const { document } = await showFracasDocument(collisionDefinesFrc);
-        const completions = await findCompletions(document, new vscode.Position(68, 57)); // cursor within empty parens "(mask phys-collision-channel )"
+        const completions = await findCompletions(document, new vscode.Position(69, 57)); // cursor within empty parens "(mask phys-collision-channel )"
         assert.ok(completions, "findCompletions for (mask phys-collision-channel... returned null");
         const expectedMembers = ["world-static", "world-dynamic", "pawn", "visibility", "camera", "physics-body", "vehicle", "destructible", "engine-1", "engine-2", "engine-3", "engine-4", "engine-5", "engine-6", "player", "trigger", "actionable", "weapon", "projectile", "pushable", "invisible-wall", "pet"];
         for (const member of expectedMembers) {
@@ -192,7 +203,7 @@ suite("Auto-Completion Tests", () => {
 
     test("findCompletions resolves all mask members", async () => {
         const { document } = await showFracasDocument(collisionDefinesFrc);
-        const completions = await findCompletions(document, new vscode.Position(67, 66)); // cursor just after "(mask phys-collision-channel "
+        const completions = await findCompletions(document, new vscode.Position(68, 66)); // cursor just after "(mask phys-collision-channel "
         assert.ok(completions, "findCompletions for (mask phys-collision-channel... returned null");
         const expectedMembers = ["world-static", "world-dynamic", "pawn", "visibility", "camera", "physics-body", "vehicle", "destructible", "engine-1", "engine-2", "engine-3", "engine-4", "engine-5", "engine-6", "player", "trigger", "actionable", "weapon", "projectile", "pushable", "invisible-wall", "pet"];
         for (const member of expectedMembers) {
