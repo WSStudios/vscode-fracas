@@ -6,6 +6,7 @@ import {
     findTextInFiles, 
     getRange, 
     getSelectedSymbol, 
+    matchAll, 
     regexGroupDocumentLocation, 
     regexGroupUriLocation, 
     resolvePosition, 
@@ -115,8 +116,18 @@ function _anyConstructorRx(): string {
     return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_CHAR_IDENTIFIER}+):`;
 }
 
-function _importRx(): string {
-    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*import(\\+export)?`;
+/**
+ * @returns a regex that matches an import declaration such as "(import ..."
+ */
+function _importKeywordRx(): string {
+    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*import(?:\\+export)?`;
+}
+
+/**
+ * @returns a regex that captures the body of an import expression such as "(import one two three)".
+ */
+function _importExpressionRx(): string {
+    return `${_importKeywordRx()}[\\s\\n]+([^${RX_CHARS_CLOSE_PAREN}]+)(?=[${RX_CHARS_CLOSE_PAREN}])`;
 }
 
 function _anyFieldSymbolDeclarationRx(fieldName: string, searchKind = SearchKind.wholeMatch): string {
@@ -335,12 +346,12 @@ function _memberDeclRx(
             return new RegExp(memberName ? 
                 _anyNamedParamSymbolDeclarationRx(memberName, searchKind) :
                 _anyNamedParamDeclarationRx(), 
-                "g");
+                "gd");
         case (FracasDefinitionKind.key):
         case (FracasDefinitionKind.text):
         case (FracasDefinitionKind.enum):
         case (FracasDefinitionKind.mask):
-            return new RegExp(_anyIdentifierRx(memberName, searchKind), "g");
+            return new RegExp(_anyIdentifierRx(memberName, searchKind), "gd");
         case (FracasDefinitionKind.syntax):
         case (FracasDefinitionKind.variant):
         case (FracasDefinitionKind.variantOption):
@@ -352,7 +363,8 @@ function _memberDeclRx(
         default:
             return new RegExp(memberName ?
                 _anyFieldSymbolDeclarationRx(memberName, searchKind) :
-                _anyFieldDeclarationRx());
+                _anyFieldDeclarationRx(),
+                "gd");
     }
 }
 
@@ -549,7 +561,7 @@ export async function findEnclosingDefine(uri: vscode.Uri, pos: vscode.Position
     if (result) {
         const {line, match} = result;
         const [_, defToken, symbol] = match;
-        const defineLoc = await regexGroupUriLocation(uri, match, line.range.start, 2 /* rx group for the symbol */);
+        const defineLoc = await regexGroupUriLocation(match, 2 /* rx group for the symbol */, uri, line.range.start);
         return new FracasDefinition(defineLoc, symbol, definitionKind(defToken));
     }
     return undefined;
@@ -580,11 +592,11 @@ export async function findEnclosingEnumOrMask(document: vscode.TextDocument, pos
     }
 
     const searchRx = new RegExp(_anyMaskOrEnumRx());
-    const result = searchRx.exec(document.getText(new vscode.Range(openParen, pos)));
-    if (result) {
-        const [_, typeDecl, typeName] = result;
+    const match = searchRx.exec(document.getText(new vscode.Range(openParen, pos)));
+    if (match) {
+        const [_, typeDecl, typeName] = match;
         const fracasKind = typeDecl === "enum" ? FracasDefinitionKind.enum : FracasDefinitionKind.mask;
-        const location = regexGroupDocumentLocation(document, result, openParen, 2 /* rx group for the enum name */);
+        const location = regexGroupDocumentLocation(match, 2 /* rx group for the enum name */, document, openParen);
         return new FracasDefinition(location, typeName, fracasKind);
     }
     return undefined;
@@ -606,7 +618,7 @@ export function isWithinImport(document: vscode.TextDocument, pos: vscode.Positi
         return false;
     }
 
-    const searchRx = new RegExp(_importRx());
+    const searchRx = new RegExp(_importKeywordRx());
     const result = searchRx.exec(document.getText(new vscode.Range(openParen, pos)));
     return !!result;
 }
@@ -651,7 +663,7 @@ async function _findDefinition(
         const rxMatch = new RegExp(defineRxStr).exec(textMatch.preview.text);
         if (rxMatch) {
             const [_, defToken, symbol] = rxMatch;
-            const location = await regexGroupUriLocation(textMatch.uri, rxMatch, getRange(textMatch.ranges).start, 2);
+            const location = await regexGroupUriLocation(rxMatch, 2, textMatch.uri, getRange(textMatch.ranges).start);
             return new FracasDefinition(location, symbol, definitionKind(defToken));
         } else {
             vscode.window.showErrorMessage(`Failed to extract symbol name from ${textMatch.preview.text} using regex '${defineRxStr}'. An engineer should check that the regex is correct.`);
@@ -698,7 +710,45 @@ export async function findVariantOptionDefinition(
     return variantDefs.filter(x => x !== undefined) as FracasDefinition[];
 }
 
-export async function findImportDefinition(
+/**
+ * Find every file imported by a document. The "definition" of an import points to the 
+ * uri and position at the beginning of the imported file.
+ * @param document the document to search
+ * @returns a list of FracasDefinition for each file imported by this document
+ */
+export function findAllImportDefinitions(
+    document: vscode.TextDocument
+): FracasDefinition[] {
+    const importExprRx = new RegExp(_importExpressionRx(), "gd");
+
+    // find all (import ...) expressions in the document
+    const importExpressions = matchAll(importExprRx, document, 1);
+
+    // extract the import definitions from each expression, 
+    // e.g. get defs for "unreal" and "abilities" from "(import unreal abilities)"
+    const allImportDefs = importExpressions
+        .filter(expr => isWithinImport(document, expr.range.start)) // drop matches that are commented out
+        .map(expr => {
+            // extract the import symbols from the expression, e.g. get "unreal" from "(import unreal abilities)"
+            const imports = matchAll(/([a-zA-Z-/]+)/gd, document, 0, expr.range);
+            const importDefs = imports
+                .filter(imp => !_isCommentedOut(document, imp.range.start)) // drop comments
+                .map(imp => _importToDefinition(document.getText(imp.range))); // convert to FracasDefinition
+            return importDefs;
+        });
+
+    return flatten(allImportDefs);
+}
+
+/**
+ * Find a file imported by the symbol at the given position. The "definition" 
+ * of an import points to the  uri and position at the beginning of the imported file.
+ * @param document the document to search
+ * @param position a position within the import symbol
+ * @param importSymbol the text of the import symbol, like "fracas/utils/utils"
+ * @returns FracasDefinition for the imported file
+ */
+async function _findImportDefinition(
     document: vscode.TextDocument,
     position: vscode.Position,
     importSymbol: string
@@ -707,19 +757,41 @@ export async function findImportDefinition(
         return undefined;
     }
 
-    const importPath = importSymbol.startsWith("fracas/") ? importSymbol : "fracas/" + importSymbol;
-    const importedUri = vscode.Uri.joinPath(getProjectFolder().uri, importPath + ".frc");
+    const importDef = _importToDefinition(importSymbol);
     try {
         // make sure imported file exists
-        await vscode.workspace.fs.stat(importedUri);
-        const importDef = new FracasDefinition(
-            new vscode.Location(importedUri, new vscode.Position(0, 0)),
-            importSymbol, FracasDefinitionKind.import);
-    
+        await vscode.workspace.fs.stat(importDef.location.uri);
         return importDef;
     } catch {
         return undefined;
     }
+}
+
+/**
+ * convert an import symbol to a "definition" that points to the uri and position at the
+ * beginning of the imported file.
+ * @param importSymbol the text of the import symbol, like "fracas/utils/utils"
+ * @returns a FracasDefinition pointing to the imported file
+ */
+function _importToDefinition(importSymbol: string): FracasDefinition {
+    const importPath = importSymbol.startsWith("fracas/") ? importSymbol : "fracas/" + importSymbol;
+    const importedUri = vscode.Uri.joinPath(getProjectFolder().uri, importPath + ".frc");
+    const importDef = new FracasDefinition(
+        new vscode.Location(importedUri, new vscode.Position(0, 0)),
+        importSymbol, FracasDefinitionKind.import);
+    
+    return importDef;
+}
+
+/**
+ * Check if a line is commented out a given position.
+ * @param document the document containing the text
+ * @param position the position of the text
+ * @returns true if the line is commented out at the position
+ */
+function _isCommentedOut(document: vscode.TextDocument, position: vscode.Position): boolean {
+    const prefix = document.getText(new vscode.Range(position.with({ character: 0 }), position));
+    return prefix.includes(";");
 }
 
 export async function findKeywordDefinition(
@@ -821,7 +893,7 @@ export async function findDefinition(
     const symbol = getSelectedSymbol(document, position, true);
 
     // if the cursor is within an (import ... ) statement, find the source document
-    const importDef = await findImportDefinition(document, position, symbol);
+    const importDef = await _findImportDefinition(document, position, symbol);
     if (importDef) {
         return [importDef];
     }
@@ -1025,32 +1097,24 @@ export async function findMembers(
     }
 
     // find members that match the given name
-    const members: FracasDefinition[] = [];
     if (fracasDef.kind === FracasDefinitionKind.enum || fracasDef.kind === FracasDefinitionKind.mask) 
     {
         // short-circuit for enum and mask members: this is a hacky workaround because mask 
         // members may be naked identifiers, or may be s-expressions that contain a single identifier with 
         // metadata. It's impossible to write a single regexp that handles both.
-        for (const range of ranges) {
-            const enumMembers = _findEnumMembers(
-                document, range, definitionMemberKind(fracasDef.kind), searchKind, memberName);
-            members.push(...enumMembers);
-        }
+        const enumMembers = ranges.map(range =>
+            _findEnumMembers(document, range, definitionMemberKind(fracasDef.kind), searchKind, memberName));
+        return flatten(enumMembers);
     } else { // for types other than enums and masks, use the regexp to find members
         const fieldRx = _memberDeclRx(fracasDef.kind, memberName ?? '', searchKind);
-        for (const range of ranges) {
+        const members = ranges.map(range => {
             // search at this scope for members
-            const expr = document.getText(range);
-            for (let match = fieldRx.exec(expr); match; match = fieldRx.global ? fieldRx.exec(expr) : null) {
-                const rxGroupIndex = 1;
-                const memberName = match[rxGroupIndex];
-                const loc = regexGroupDocumentLocation(document, match, range.start, rxGroupIndex);
-                members.push(new FracasDefinition(loc, memberName, definitionMemberKind(fracasDef.kind)));
-            }
-        }
+            const matches = matchAll(fieldRx, document, 1, range);
+            return matches.map(match => 
+                new FracasDefinition(match, document.getText(match.range), definitionMemberKind(fracasDef.kind)));
+        });
+        return flatten(members);
     }
-
-    return members;
 }
 
 function _findEnumMembers(

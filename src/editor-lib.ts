@@ -139,6 +139,26 @@ export function resolvePosition(
 }
 
 /**
+ * 
+ * @param text The text to split into lines
+ * @param newline The newline character sequence used to split the text into lines
+ * @returns An array of 
+ */
+function _computeTextLineStarts(text: string, newline: string): Uint32Array {
+    const textLines = text.split(newline);
+    const textLineStarts = new Uint32Array(textLines.length);
+
+    // compute the offsets of each line start within the text block
+    let textOffset = 0;
+    for (let index = 0; index < textLines.length; index++) {
+        textLineStarts[index] = textOffset;
+        textOffset += textLines[index].length + newline.length;
+    }
+
+    return textLineStarts;
+}
+
+/**
  * Translate ranges from a block of text into equivalent ranges offset within a document.
  * @param text A block of text referenced by the textRanges array.
  * @param textRanges An array of ranges within the text.
@@ -154,21 +174,13 @@ export function textRangesToDocumentRanges(
     document: vscode.TextDocument, 
     documentPos: vscode.Position)
 : vscode.Range[] {
-    const textLines = text.split(newline);
-    const textLineStarts = new Uint32Array(textLines.length);
+    const textLineStarts = _computeTextLineStarts(text, newline);
 
-    // compute the offsets of each line start within the text block
-    let textOffset = 0;
-    for (let index = 0; index < textLines.length; index++) {
-        textLineStarts[index] = textOffset;
-        textOffset += textLines[index].length + newline.length;
-    }
-
+    const docPosOffset = document.offsetAt(documentPos);
     const documentRanges = textRanges.map(textRange => {
         // convert the text range to offsets within the text block
         const textStartOffset = textLineStarts[textRange.start.line] + textRange.start.character;
         const textEndOffset = textLineStarts[textRange.end.line] + textRange.end.character;
-        const docPosOffset = document.offsetAt(documentPos);
         
         // translate the text offsets to document positions
         const docStart = document.positionAt(docPosOffset + textStartOffset);
@@ -177,6 +189,61 @@ export function textRangesToDocumentRanges(
     });
 
     return documentRanges;
+}
+
+function _textSubstringsToDocumentLocations(
+    document: vscode.TextDocument,
+    documentTextPosition: vscode.Position,
+    text: string,
+    substrings: { start: number, length: number }[]
+): vscode.Location[] {
+    // convert start/length pairs to indices within the text block
+    const textIndices = [];
+    for (const substring of substrings) {
+        textIndices.push(substring.start, substring.start + substring.length);
+    }
+
+    // convert indices into offsets
+    const textOffsets = _textIndicesToOffsets(textIndices, text);
+
+    // translate the text offsets to document positions
+    const documentLocations = [];
+    const docPosOffset = document.offsetAt(documentTextPosition);
+    for (let i = 0; i < substrings.length; ++i) {
+        const docStart = document.positionAt(docPosOffset + textOffsets[2 * i]);
+        const docEnd = document.positionAt(docPosOffset + textOffsets[2 * i + 1]);
+        const range = new vscode.Range(docStart, docEnd);
+        documentLocations.push(new vscode.Location(document.uri, range));
+    }
+
+    return documentLocations;
+}
+
+/**
+ * Convert indices into a block of text into equivalent document offsets. VS code
+ * document offsets are based on line number and character index within the line, which
+ * ignores multiple-character newlines such as CRLF. This function corrects the newline
+ * length overages in the pure character index.
+ * @param indices An array of indices into the text string.
+ * @param text The string to which the indices refer.
+ * @returns An array of offsets equivalent to the indices array.
+ */
+function _textIndicesToOffsets(indices: number[], text: string): number[] {
+    const offsets = [];
+    let offset = 0;
+    let character = 0;
+    for (const index of indices) {
+        while (character < index) {
+            // if (text[character] !== '\r') { // VS code document offsets ignore carriage returns.
+                offset += 1;
+            // }
+            character += 1;
+        }
+
+        offsets.push(offset);
+    }
+
+    return offsets;
 }
 
 /**
@@ -236,40 +303,64 @@ export async function searchBackward(uri: vscode.Uri, pos: vscode.Position, sear
 // REGEXP UTILS /////////////////////////////////////////////////////////////////
 
 /**
- * Find the range covering a group within a regex match. For example, given /\((define-type)\s*(cool-stuff))/,
+ * Find the document location covering a group within a regex match. For example, given 
+ * /\((define-type)\s*(cool-stuff))/,
  * calculate the range around "cool-stuff".
  * @param match The expression containing a group to locate.
- * @param matchPosition The document position at which the match starts.
  * @param group The index of the group within the regex match array.
- * @returns The range of the group
+ * @param document The document in which the match occurs.
+ * @param searchPosition The starting position of the text matched against the regex.
+ * @returns The location of the capture group within the document.
  */
+// export function regexGroupDocumentLocation(
+//     document: vscode.TextDocument,
+//     match: RegExpExecArray,
+//     matchPosition: vscode.Position,
+//     group: number
+// ): vscode.Location {
+//     // calculate the offset of the regex group within the match
+//     const locations = _textSubstringsToDocumentLocations(
+//         document, matchPosition, match.input, [{ start: match.index, length: match[group].length }]);
+//     return locations[0];
+// }
 export function regexGroupDocumentLocation(
-    document: vscode.TextDocument,
     match: RegExpExecArray,
-    matchPosition: vscode.Position,
-    group: number
+    group: number,
+    document: vscode.TextDocument,
+    searchPosition?: vscode.Position
 ): vscode.Location {
     // calculate the offset of the regex group within the match
-    let groupOffset = match.index;
+    const matchOffset = searchPosition ? document.offsetAt(searchPosition) : 0;
+    let groupOffset = matchOffset + match.index;
     for (let i = 1; i < group; ++i) {
         groupOffset += match[i].length;
     }
 
     // convert the match offsets to a document range
-    const matchOffset = document.offsetAt(matchPosition);
-    const memberStart = document.positionAt(matchOffset + groupOffset);
-    const memberEnd = document.positionAt(matchOffset + groupOffset + match[group].length);
-    return new vscode.Location(document.uri, new vscode.Range(memberStart, memberEnd));
+    const groupRange = new vscode.Range(
+        document.positionAt(groupOffset), 
+        document.positionAt(groupOffset + match[group].length));
+    return new vscode.Location(document.uri, groupRange);
 }
 
+/**
+ * Convert a regex match capture group into a document location. This does the math to convert
+ * regex match index and capture group offsets into a document range.
+ * indices of the match and into document offsets.
+ * @param match The regex match to convert into a document location.
+ * @param group The index of the capture group within the match to convert.
+ * @param uri The URI of the document in which the match occurs.
+ * @param searchPosition The starting position of the text matched against the regex.
+ * @returns The location of the capture group within the document.
+ */
 export async function regexGroupUriLocation(
-    uri: vscode.Uri,
     match: RegExpExecArray,
-    matchPosition: vscode.Position,
-    group: number
+    group: number,
+    uri: vscode.Uri,
+    searchPosition?: vscode.Position
 ): Promise<vscode.Location> {
     const document = await vscode.workspace.openTextDocument(uri);
-    return regexGroupDocumentLocation(document, match, matchPosition, group);
+    return regexGroupDocumentLocation(match, group, document, searchPosition);
 }
 
 /**
@@ -346,4 +437,55 @@ function _lastMatch(searchRx: RegExp, text: string): RegExpExecArray | null {
         }
     }
     return match ?? prevMatch;
+}
+
+/**
+ * Find locations of all regex matches within a document text range.
+ * @param searchRx The regular expression to search for, probably with the "global" search flag set.
+ * @param document The document to search
+ * @param group The index of the regex capture group to extract.
+ * @param range The range of document text within which to search for matches. Defaults to the entire document.
+ * @returns locations of matches initialized with the document URI and the range of the extracted capture group.
+ */
+// export function matchAll(
+//     searchRx: RegExp, 
+//     document: vscode.TextDocument,
+//     group: number,
+//     range?: vscode.Range
+// ): vscode.Location[] {
+//     // find regex match indices in the text
+//     const text = document.getText(range);
+//     const substrings = [];
+//     for (let match = searchRx.exec(text); match; match = searchRx.global ? searchRx.exec(text) : null) {
+//         substrings.push({ start: match.index, length: match[group].length });
+//     }
+
+//     // convert text indices into document locations
+//     const documentTextPosition = range?.start ?? new vscode.Position(0, 0);
+//     const locations = _textSubstringsToDocumentLocations(document, documentTextPosition, text, substrings);
+
+//     return locations;
+// }
+export function matchAll(
+    searchRx: RegExp, 
+    document: vscode.TextDocument,
+    group: number,
+    range?: vscode.Range
+): vscode.Location[] {
+    // find regex match indices in the text
+    const text = document.getText(range);
+    const rangeOffset = range ? document.offsetAt(range.start) : 0;
+    const locations = [];
+    // for (let match = exec(searchRx, text); match; match = searchRx.global ? exec(searchRx, text) : null) {
+    for (let match of text.matchAll(searchRx)) {
+        // convert the match offsets to a document range
+        const matchOffset = (match.index ?? 0);
+        const [start, end] = match.indices ? match.indices[group] : [matchOffset, matchOffset + match[group].length]
+        const groupRange = new vscode.Range(
+            document.positionAt(rangeOffset + start), 
+            document.positionAt(rangeOffset + end));
+        locations.push(new vscode.Location(document.uri, groupRange));
+    }
+
+    return locations;
 }
