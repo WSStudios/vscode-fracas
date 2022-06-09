@@ -6,23 +6,40 @@ import {
     findTextInFiles, 
     getRange, 
     getSelectedSymbol, 
-    matchAll, 
-    regexGroupDocumentLocation, 
-    regexGroupUriLocation, 
     resolvePosition, 
     resolveRange, 
     resolveSelection, 
     resolveSymbol, 
     searchBackward 
 } from '../editor-lib';
+import { 
+    matchAll,
+    regexGroupDocumentLocation,
+    regexGroupUriLocation 
+} from '../regular-expressions';
+import { 
+    SearchKind,
+    RX_COMMENT,
+    anyConstructorRx,
+    anyDefineRx,
+    anyDefineSymbolRx,
+    anyEnumSymbolRx,
+    anyFieldDeclarationRx,
+    anyFieldSymbolDeclarationRx,
+    anyIdentifierRx,
+    anyMaskOrEnumRx,
+    anyMaskSymbolRx,
+    anyNamedParamDeclarationRx,
+    anyNamedParamSymbolDeclarationRx,
+    anySymbolRx,
+    definePartialSymbolRx,
+    enumMemberRx,
+    importExpressionRx,
+    importKeywordRx,
+    variantOptionRx 
+} from './syntax-regex';
 
-export const KEYWORD_PREFIX = '#:';
-export const RX_CHARS_OPEN_PAREN = '\\(|\\{|\\[';
-export const RX_CHARS_CLOSE_PAREN = '\\)|\\}|\\]';
-export const RX_CHARS_SPACE = '\\s|\\r|\\n';
-export const RX_CHAR_IDENTIFIER = '[\\w\\-\\*\\.]';
-export const RX_SYMBOLS_DEFINE = 'define-enum|define-game-data|define-key|define-text|define-string-table|define-mask|define-type-optional|define-syntax|define-syntax-rule|define-type|define-variant|define|define-list';
-export const RX_COMMENT = ';;?\\s*(.*)\\s*$';
+const KEYWORD_PREFIX = '#:';
 
 export enum FracasDefinitionKind {
     enum,
@@ -41,11 +58,6 @@ export enum FracasDefinitionKind {
     keyword,
     import,
     unknown
-}
-
-export enum SearchKind {
-    wholeMatch,
-    partialMatch
 }
 
 export class FracasDefinition {
@@ -74,115 +86,6 @@ export class FracasDefinition {
         this.completionKind = completionKind(kind);
     }
 
-}
-
-function _anySymbolRx(symbol: string): string {
-    return `(?<!${RX_CHAR_IDENTIFIER})(${_escapeForRegEx(symbol)})(?!${RX_CHAR_IDENTIFIER})`;
-}
-
-function _anyDefineRx(): string {
-    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${RX_CHAR_IDENTIFIER}+)(?!${RX_CHARS_CLOSE_PAREN})`;
-}
-
-function _anyDefineSymbolRx(symbol: string, searchKind = SearchKind.wholeMatch): string {
-    return searchKind === SearchKind.wholeMatch ?
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${_escapeForRegEx(symbol)})(?!${RX_CHAR_IDENTIFIER}|${RX_CHARS_CLOSE_PAREN})` :
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${_escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)(?!${RX_CHARS_CLOSE_PAREN})`;
-}
-
-function _definePartialSymbolRx(symbol: string): string {
-    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${RX_CHAR_IDENTIFIER}*${_escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)(?!${RX_CHARS_CLOSE_PAREN})`;
-}
-
-function _anyEnumSymbolRx(symbol: string, searchKind = SearchKind.wholeMatch): string {
-    return searchKind === SearchKind.wholeMatch ?
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(define-enum)\\s+(${_escapeForRegEx(symbol)})(?!${RX_CHAR_IDENTIFIER})` :
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(define-enum)\\s+(${_escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)`;
-}
-
-function _anyMaskSymbolRx(symbol: string, searchKind = SearchKind.wholeMatch): string {
-    return searchKind === SearchKind.wholeMatch ?
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(define-mask)\\s+(${_escapeForRegEx(symbol)})(?!${RX_CHAR_IDENTIFIER})` :
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(define-mask)\\s+(${_escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)`;
-}
-
-function _enumMemberRx(): string {
-    // extract the first identifier in the line, discarding leading whitespace and open parentheses
-    return `^\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${RX_CHAR_IDENTIFIER}+)`;
-}
-const ENUM_MEMBER_RX = new RegExp(_enumMemberRx());
-
-function _anyConstructorRx(): string {
-    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_CHAR_IDENTIFIER}+):`;
-}
-
-/**
- * @returns a regex that matches an import declaration such as "(import ..."
- */
-function _importKeywordRx(): string {
-    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*import(?:\\+export)?`;
-}
-
-/**
- * @returns a regex that captures the body of an import expression such as "(import one two three)".
- */
-function _importExpressionRx(): string {
-    return `${_importKeywordRx()}[\\s\\n]+([^${RX_CHARS_CLOSE_PAREN}]+)(?=[${RX_CHARS_CLOSE_PAREN}])`;
-}
-
-function _anyFieldSymbolDeclarationRx(fieldName: string, searchKind = SearchKind.wholeMatch): string {
-    return searchKind === SearchKind.wholeMatch ?
-        `(?<=^\\s*[${RX_CHARS_OPEN_PAREN}])\\s*(${_escapeForRegEx(fieldName)})(?!${RX_CHAR_IDENTIFIER})` :
-        `(?<=^\\s*[${RX_CHARS_OPEN_PAREN}])\\s*(${_escapeForRegEx(fieldName)}${RX_CHAR_IDENTIFIER}*)`;
-}
-
-function _anyFieldDeclarationRx(): string {
-    return `(?<=^\\s*[${RX_CHARS_OPEN_PAREN}])\\s*(?!define)(${RX_CHAR_IDENTIFIER}+)`;
-}
-
-function _anyNamedParamSymbolDeclarationRx(paramName: string, searchKind = SearchKind.wholeMatch): string {
-    return searchKind === SearchKind.wholeMatch ?
-        `(?<=#:)(${_escapeForRegEx(paramName)})(?!${RX_CHAR_IDENTIFIER})` :
-        `(?<=#:)(${_escapeForRegEx(paramName)}${RX_CHAR_IDENTIFIER}*)`;
-}
-
-function _anyNamedParamDeclarationRx(): string {
-    return `(?<=#:)(${RX_CHAR_IDENTIFIER}+)`;
-}
-
-
-function _anyMaskOrEnumRx(): string {
-    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(mask|enum)\\s+(${RX_CHAR_IDENTIFIER}+)`;
-}
-
-function _anyIdentifierRx(fieldName: string, searchKind = SearchKind.wholeMatch): string {
-    if (searchKind === SearchKind.wholeMatch) {
-        return `(?<!${RX_CHAR_IDENTIFIER})(${_escapeForRegEx(fieldName)})(?!${RX_CHAR_IDENTIFIER})`;
-    } else {
-        // if the field name isn't empty, find anything starting with the name. Otherwise, find 1 or more identifier chars.
-        const fieldExpr = fieldName ? `(${_escapeForRegEx(fieldName)}${RX_CHAR_IDENTIFIER}*)` : `(${RX_CHAR_IDENTIFIER}+)`;
-        // // This ensures that identifiers appear either at the very beginning of an s-expression, e.g. "(some-identifier...)"
-        // // or are naked identifiers (not enclosed within an s-expression), e.g. "some-identifier another-identifier third-id"
-        // return `(?:[${RX_CHARS_OPEN_PAREN}]\\s*|[^${RX_CHARS_OPEN_PAREN}]*)${fieldExpr}`;
-        return fieldExpr;
-    }
-}
-
-function _variantOptionRx(symbol: string, searchKind = SearchKind.wholeMatch): string {
-    // a variant option has a prefix for the variant type followed by the option name.
-    // e.g., (define-variant action (movement-modifier-add ... ) appears as "action-movement-modifier-add".
-    // Make an rx that drops one or more prefixes, and then match the rest of the string.
-    const crumbs = _escapeForRegEx(symbol)
-        .split('-') // "action-movement-modifier-add" -> ["action", "movement", "modifier", "add"]
-        .filter(c => c.length > 0);		// remove dangling hyphens
-    const optionRx = crumbs
-        .slice(1, crumbs.length - 1) 		// -> ["movement", "modifier"]
-        .map(s => `(${s}-)?`) 			// -> ["(movement-)?", "(modifier-)?"]
-        .join('') + crumbs[crumbs.length - 1]; // -> "(movement-)?(modifier-)?add"
-
-    return searchKind === SearchKind.wholeMatch ?
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${optionRx})(?!${RX_CHAR_IDENTIFIER})` :
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${optionRx})(${RX_CHAR_IDENTIFIER}*)`;
 }
 
 export function definitionKind(defToken: string): FracasDefinitionKind {
@@ -344,14 +247,14 @@ function _memberDeclRx(
     switch (fracasKind) {
         case (FracasDefinitionKind.define):
             return new RegExp(memberName ? 
-                _anyNamedParamSymbolDeclarationRx(memberName, searchKind) :
-                _anyNamedParamDeclarationRx(), 
+                anyNamedParamSymbolDeclarationRx(memberName, searchKind) :
+                anyNamedParamDeclarationRx(), 
                 "gd");
         case (FracasDefinitionKind.key):
         case (FracasDefinitionKind.text):
         case (FracasDefinitionKind.enum):
         case (FracasDefinitionKind.mask):
-            return new RegExp(_anyIdentifierRx(memberName, searchKind), "gd");
+            return new RegExp(anyIdentifierRx(memberName, searchKind), "gd");
         case (FracasDefinitionKind.syntax):
         case (FracasDefinitionKind.variant):
         case (FracasDefinitionKind.variantOption):
@@ -362,8 +265,8 @@ function _memberDeclRx(
         case (FracasDefinitionKind.unknown):
         default:
             return new RegExp(memberName ?
-                _anyFieldSymbolDeclarationRx(memberName, searchKind) :
-                _anyFieldDeclarationRx(),
+                anyFieldSymbolDeclarationRx(memberName, searchKind) :
+                anyFieldDeclarationRx(),
                 "gd");
     }
 }
@@ -556,7 +459,7 @@ function _rangesAtScope(
 
 export async function findEnclosingDefine(uri: vscode.Uri, pos: vscode.Position
 ): Promise<FracasDefinition | undefined> {
-    const searchRx = new RegExp(_anyDefineRx(), "g");
+    const searchRx = new RegExp(anyDefineRx(), "g");
     const result = await searchBackward(uri, pos, searchRx);
     if (result) {
         const {line, match} = result;
@@ -574,7 +477,7 @@ export async function findEnclosingConstructor(document: vscode.TextDocument, po
         return undefined;
     }
 
-    const searchRx = new RegExp(_anyConstructorRx());
+    const searchRx = new RegExp(anyConstructorRx());
     const result = searchRx.exec(document.getText(new vscode.Range(openParen, pos)));
     if (result) {
         const [_, typeName] = result;
@@ -591,7 +494,7 @@ export async function findEnclosingEnumOrMask(document: vscode.TextDocument, pos
         return undefined;
     }
 
-    const searchRx = new RegExp(_anyMaskOrEnumRx());
+    const searchRx = new RegExp(anyMaskOrEnumRx());
     const match = searchRx.exec(document.getText(new vscode.Range(openParen, pos)));
     if (match) {
         const [_, typeDecl, typeName] = match;
@@ -618,7 +521,7 @@ export function isWithinImport(document: vscode.TextDocument, pos: vscode.Positi
         return false;
     }
 
-    const searchRx = new RegExp(_importKeywordRx());
+    const searchRx = new RegExp(importKeywordRx());
     const result = searchRx.exec(document.getText(new vscode.Range(openParen, pos)));
     return !!result;
 }
@@ -629,7 +532,7 @@ export async function findSymbolDefinition(
     searchKind = SearchKind.wholeMatch
 ): Promise<FracasDefinition[]> {
     typeName = typeName.replace(/(^-)|(-$)/g, ''); // trim leading/trailing hyphen
-    const defineRxStr = _anyDefineSymbolRx(typeName, searchKind);
+    const defineRxStr = anyDefineSymbolRx(typeName, searchKind);
     return _findDefinition(defineRxStr, token);
 }
 
@@ -638,7 +541,7 @@ export async function findEnumDefinition(
     token?: vscode.CancellationToken,
     searchKind = SearchKind.wholeMatch
 ): Promise<FracasDefinition[]> {
-    const defineRxStr = _anyEnumSymbolRx(typeName, searchKind);
+    const defineRxStr = anyEnumSymbolRx(typeName, searchKind);
     return _findDefinition(defineRxStr, token);
 }
 
@@ -647,7 +550,7 @@ export async function findMaskDefinition(
     token?: vscode.CancellationToken,
     searchKind = SearchKind.wholeMatch
 ): Promise<FracasDefinition[]> {
-    const defineRxStr = _anyMaskSymbolRx(typeName, searchKind);
+    const defineRxStr = anyMaskSymbolRx(typeName, searchKind);
     return _findDefinition(defineRxStr, token);
 }
 
@@ -680,7 +583,7 @@ export async function findVariantOptionDefinition(
     searchKind = SearchKind.wholeMatch
 ): Promise<FracasDefinition[]> {
     // given a fully qualified "action-movement-modifier-add" find "(movement-modifier-add ... )"
-    const variantOptionRxStr = _variantOptionRx(qualifiedVariant, searchKind);
+    const variantOptionRxStr = variantOptionRx(qualifiedVariant, searchKind);
     const variantRx = new RegExp(variantOptionRxStr);
     const textMatches = await findTextInFiles(variantOptionRxStr, token);
 
@@ -719,7 +622,7 @@ export async function findVariantOptionDefinition(
 export function findAllImportDefinitions(
     document: vscode.TextDocument
 ): FracasDefinition[] {
-    const importExprRx = new RegExp(_importExpressionRx(), "gd");
+    const importExprRx = new RegExp(importExpressionRx(), "gd");
 
     // find all (import ...) expressions in the document
     const importExpressions = matchAll(importExprRx, document, 1);
@@ -757,14 +660,7 @@ async function _findImportDefinition(
         return undefined;
     }
 
-    const importDef = _importToDefinition(importSymbol);
-    try {
-        // make sure imported file exists
-        await vscode.workspace.fs.stat(importDef.location.uri);
-        return importDef;
-    } catch {
-        return undefined;
-    }
+    return _importToDefinition(importSymbol);
 }
 
 /**
@@ -929,7 +825,7 @@ export async function findReferences(
     
     const symbol = getSelectedSymbol(document, position);
     // Do a dumb search for all text matching the symbol
-    const symbolRx = _anySymbolRx(symbol);
+    const symbolRx = anySymbolRx(symbol);
     const results = await findTextInFiles(symbolRx, token);
 
     // if the symbol is part of a variant, search for the full variant option name. E.g. if the cursor is
@@ -937,7 +833,7 @@ export async function findReferences(
     const fracasDef = await findEnclosingDefine(document.uri, position);
     if (fracasDef?.kind === FracasDefinitionKind.variant) {
         const variantOption = `${fracasDef.symbol}-${symbol}`;
-        const variantResults = await findTextInFiles(_anySymbolRx(variantOption), token);
+        const variantResults = await findTextInFiles(anySymbolRx(variantOption), token);
         results.push(...variantResults);
     }
 
@@ -963,7 +859,7 @@ export async function findWorkspaceSymbols(
 async function _findSymbols(
     symbol?: string, uri?: vscode.Uri, token?: vscode.CancellationToken
 ): Promise<vscode.SymbolInformation[]> {
-    const defineRxStr = symbol ? _definePartialSymbolRx(symbol) : _anyDefineRx();
+    const defineRxStr = symbol ? definePartialSymbolRx(symbol) : anyDefineRx();
     const defineRx = new RegExp(defineRxStr);
     const textMatches = await findTextInFiles(defineRxStr, token, uri?.fsPath);
     const symbols = textMatches
@@ -1117,6 +1013,8 @@ export async function findMembers(
     }
 }
 
+const ENUM_MEMBER_RX = new RegExp(enumMemberRx());
+
 function _findEnumMembers(
     document: vscode.TextDocument,
     enumBodyRange: vscode.Range,
@@ -1150,8 +1048,4 @@ function _findEnumMembers(
     } while (lineMatch);
 
     return enumMembers;
-}
-
-function _escapeForRegEx(s: string): string {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

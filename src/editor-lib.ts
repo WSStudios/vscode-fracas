@@ -4,24 +4,16 @@ import {
     fracasOut,
     getProjectFolder
 } from './config';
+import { lastMatch } from './regular-expressions';
 
-export function withEditor(func: (vscodeEditor: vscode.TextEditor) => void): void {
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-        func(editor);
-    } else {
-        vscode.window.showErrorMessage("A file must be opened before you can do that");
-    }
-}
-
-export function withFilePath(func: (filePath: string) => void): void {
-    withEditor((editor: vscode.TextEditor) => func(path.resolve(editor.document.fileName)));
-}
-
-export function getRange(ranges: (vscode.Range | vscode.Range[])): vscode.Range {
-    return Array.isArray(ranges) ? ranges[0] : ranges;
-}
-
+/**
+ * Search many documents to find matches for a regular expression.
+ * @param searchRx The regular expression used to search files
+ * @param token Cancellation token that can be used to abort the search.
+ * @param include The file name pattern to use for the search. Defaults to all 
+ * fracas docs in the project directory.
+ * @returns The collection of text entries that match `searchRx` in the documents.
+ */
 export async function findTextInFiles(
     searchRx: string,
     token?: vscode.CancellationToken,
@@ -52,6 +44,13 @@ export async function findTextInFiles(
     return results;
 }
 
+/**
+ * Find the word at the cursor position in the given document.
+ * @param document The document in which to find a word, or undefined to use the active editor document.
+ * @param where The cursor position or range at which to find a word, or undefined to use the active editor selection.
+ * @param stripTrailingColon true to strip trailing colons from the symbol
+ * @returns The symbol at the given position in the given document.
+ */
 export function getSelectedSymbol(
     document?: vscode.TextDocument, where?: vscode.Range | vscode.Position, stripTrailingColon = false
 ): string {
@@ -116,6 +115,12 @@ export function resolveSymbol(
     return undefined;
 }
 
+/**
+ * Resolve a selection to ensure that it exists. If undefined data is passed, use the selection from the active editor.
+ * @param referencingDocument The document within which text is selected, or undefined to use the active editor document.
+ * @param documentSelection The selection range to use, or undefined to use the current selection in the active editor.
+ * @returns the resolved, non-null document and selection
+ */
 export function resolveSelection(
     referencingDocument?: vscode.TextDocument,
     documentSelection?: vscode.Range,
@@ -127,7 +132,13 @@ export function resolveSelection(
     };
 }
 
-export function resolvePosition(
+/**
+ * Resolve a position to ensure that it exists. If undefined data is passed, use the cursor from the active editor.
+ * @param referencingDocument The document within which to find a position, or undefined to use the active editor document.
+ * @param documentPosition The cursor position to use, or undefined to use the current anchor in the active editor.
+ * @returns the resolved, non-null document and position
+ */
+ export function resolvePosition(
     referencingDocument?: vscode.TextDocument,
     documentPosition?: vscode.Position,
 ): { document: vscode.TextDocument | undefined, position: vscode.Position | undefined } {
@@ -136,6 +147,36 @@ export function resolvePosition(
         document: referencingDocument ?? activeEditor?.document,
         position: documentPosition ?? activeEditor?.selection?.active
     };
+}
+
+/**
+ * Invoke a lambda function on the active editor.
+ * @param func A lambda to apply to the active editor
+ */
+ export function withEditor(func: (vscodeEditor: vscode.TextEditor) => void): void {
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+        func(editor);
+    } else {
+        vscode.window.showErrorMessage("A file must be opened before you can do that");
+    }
+}
+
+/**
+ * Invoke a function passing the filename of the active editor document
+ * @param func A lambda to apply to the active editor document filename.
+ */
+export function withFilePath(func: (filePath: string) => void): void {
+    withEditor((editor: vscode.TextEditor) => func(path.resolve(editor.document.fileName)));
+}
+
+/**
+ * Resolve a range or array of ranges to a single range.
+ * @param ranges The range, or an array of ranges.
+ * @returns The given range, or the first element of the array if it is an array.
+ */
+export function getRange(ranges: (vscode.Range | vscode.Range[])): vscode.Range {
+    return Array.isArray(ranges) ? ranges[0] : ranges;
 }
 
 /**
@@ -156,39 +197,6 @@ function _computeTextLineStarts(text: string, newline: string): Uint32Array {
     }
 
     return textLineStarts;
-}
-
-/**
- * Translate ranges from a block of text into equivalent ranges offset within a document.
- * @param text A block of text referenced by the textRanges array.
- * @param textRanges An array of ranges within the text.
- * @param newline The newline character to use when splitting the text.
- * @param document The document for which to compute the ranges.
- * @param documentPos The position within the document at which the text block.
- * @returns ranges within the document corresponding to the textRanges array.
- */
-export function textRangesToDocumentRanges(
-    text: string,
-    textRanges: vscode.Range[],
-    newline: string,
-    document: vscode.TextDocument, 
-    documentPos: vscode.Position)
-: vscode.Range[] {
-    const textLineStarts = _computeTextLineStarts(text, newline);
-
-    const docPosOffset = document.offsetAt(documentPos);
-    const documentRanges = textRanges.map(textRange => {
-        // convert the text range to offsets within the text block
-        const textStartOffset = textLineStarts[textRange.start.line] + textRange.start.character;
-        const textEndOffset = textLineStarts[textRange.end.line] + textRange.end.character;
-        
-        // translate the text offsets to document positions
-        const docStart = document.positionAt(docPosOffset + textStartOffset);
-        const docEnd = document.positionAt(docPosOffset + textEndOffset);
-        return new vscode.Range(docStart, docEnd);
-    });
-
-    return documentRanges;
 }
 
 /**
@@ -232,7 +240,7 @@ export async function searchBackward(uri: vscode.Uri, pos: vscode.Position, sear
     let line = doc.lineAt(lineNo);
     let lineText = line.text.substring(0, pos.character);
     while (lineNo >= 0) {
-        const match = _lastMatch(searchRx, lineText);
+        const match = lastMatch(searchRx, lineText);
         if (match) {
             return { line, match };
         }
@@ -244,57 +252,37 @@ export async function searchBackward(uri: vscode.Uri, pos: vscode.Position, sear
     return undefined;
 }
 
-
-// REGEXP UTILS /////////////////////////////////////////////////////////////////
-
 /**
- * Find the document location covering a group within a regex match. For example, given 
- * /\((define-type)\s*(cool-stuff))/,
- * calculate the range around "cool-stuff".
- * @param match The expression containing a group to locate.
- * @param group The index of the group within the regex match array.
- * @param document The document in which the match occurs.
- * @param searchPosition The starting position of the text matched against the regex.
- * @returns The location of the capture group within the document.
+ * Translate ranges from a block of text into equivalent ranges offset within a document.
+ * @param text A block of text referenced by the textRanges array.
+ * @param textRanges An array of ranges within the text.
+ * @param newline The newline character to use when splitting the text.
+ * @param document The document for which to compute the ranges.
+ * @param documentPos The position within the document at which the text block.
+ * @returns ranges within the document corresponding to the textRanges array.
  */
-export function regexGroupDocumentLocation(
-    match: RegExpExecArray,
-    group: number,
-    document: vscode.TextDocument,
-    searchPosition?: vscode.Position
-): vscode.Location {
-    // calculate the offset of the regex group within the match
-    const matchOffset = searchPosition ? document.offsetAt(searchPosition) : 0;
-    let groupOffset = matchOffset + match.index;
-    for (let i = 1; i < group; ++i) {
-        groupOffset += match[i].length;
-    }
+ export function textRangesToDocumentRanges(
+    text: string,
+    textRanges: vscode.Range[],
+    newline: string,
+    document: vscode.TextDocument, 
+    documentPos: vscode.Position)
+: vscode.Range[] {
+    const textLineStarts = _computeTextLineStarts(text, newline);
 
-    // convert the match offsets to a document range
-    const groupRange = new vscode.Range(
-        document.positionAt(groupOffset), 
-        document.positionAt(groupOffset + match[group].length));
-    return new vscode.Location(document.uri, groupRange);
-}
+    const docPosOffset = document.offsetAt(documentPos);
+    const documentRanges = textRanges.map(textRange => {
+        // convert the text range to offsets within the text block
+        const textStartOffset = textLineStarts[textRange.start.line] + textRange.start.character;
+        const textEndOffset = textLineStarts[textRange.end.line] + textRange.end.character;
+        
+        // translate the text offsets to document positions
+        const docStart = document.positionAt(docPosOffset + textStartOffset);
+        const docEnd = document.positionAt(docPosOffset + textEndOffset);
+        return new vscode.Range(docStart, docEnd);
+    });
 
-/**
- * Convert a regex match capture group into a document location. This does the math to convert
- * regex match index and capture group offsets into a document range.
- * indices of the match and into document offsets.
- * @param match The regex match to convert into a document location.
- * @param group The index of the capture group within the match to convert.
- * @param uri The URI of the document in which the match occurs.
- * @param searchPosition The starting position of the text matched against the regex.
- * @returns The location of the capture group within the document.
- */
-export async function regexGroupUriLocation(
-    match: RegExpExecArray,
-    group: number,
-    uri: vscode.Uri,
-    searchPosition?: vscode.Position
-): Promise<vscode.Location> {
-    const document = await vscode.workspace.openTextDocument(uri);
-    return regexGroupDocumentLocation(match, group, document, searchPosition);
+    return documentRanges;
 }
 
 /**
@@ -354,53 +342,3 @@ export function diffToTextEdits(diff: string, newline = "\r\n"
     return edits;
 }
 
-/**
- * Find the last occurrence of a regex match within a string.
- * @param searchRx The regular expression to search for, probably with the "global" search flag set.
- * @param text The text within which to search for matches.
- * @returns The final matching instance of the regex, or undefined if no match was found. If the regex
- * is not a global search, the first match is returned.
- */
-function _lastMatch(searchRx: RegExp, text: string): RegExpExecArray | null {
-    let match = searchRx.exec(text);
-    let prevMatch = null;
-    if (searchRx.global) {
-        while (match) {
-            prevMatch = match;
-            match = searchRx.exec(text);
-        }
-    }
-    return match ?? prevMatch;
-}
-
-/**
- * Find locations of all regex matches within a document text range.
- * @param searchRx The regular expression to search for, probably with the "global" search flag set.
- * @param document The document to search
- * @param group The index of the regex capture group to extract.
- * @param range The range of document text within which to search for matches. Defaults to the entire document.
- * @returns locations of matches initialized with the document URI and the range of the extracted capture group.
- */
-export function matchAll(
-    searchRx: RegExp, 
-    document: vscode.TextDocument,
-    group: number,
-    range?: vscode.Range
-): vscode.Location[] {
-    // find regex match indices in the text
-    const text = document.getText(range);
-    const rangeOffset = range ? document.offsetAt(range.start) : 0;
-    const locations = [];
-    // for (let match = exec(searchRx, text); match; match = searchRx.global ? exec(searchRx, text) : null) {
-    for (let match of text.matchAll(searchRx)) {
-        // convert the match offsets to a document range
-        const matchOffset = (match.index ?? 0);
-        const [start, end] = match.indices ? match.indices[group] : [matchOffset, matchOffset + match[group].length]
-        const groupRange = new vscode.Range(
-            document.positionAt(rangeOffset + start), 
-            document.positionAt(rangeOffset + end));
-        locations.push(new vscode.Location(document.uri, groupRange));
-    }
-
-    return locations;
-}
