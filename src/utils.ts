@@ -7,17 +7,18 @@ export interface ExecOptions {
     input?: string;
     workingDir?: string;
     showErrors: boolean;
+    timeoutMillis: number;
 }
 
 export function execShell(
     cmd: string,
-    options: ExecOptions = { showErrors: true, workingDir: getProjectDir() }
+    options: ExecOptions = { showErrors: true, workingDir: getProjectDir(), timeoutMillis: 60_000 }
 ) : Promise<string> {
     fracasOut.appendLine(`From working dir: '${options.workingDir}'`);
     fracasOut.appendLine(`Executing: '${cmd}'`);
     return new Promise<string>((resolve, reject) => {
-        const child = cp.exec(cmd, 
-            { cwd: options.workingDir },
+        const child = cp.exec(cmd,
+            { cwd: options.workingDir, timeout: options.timeoutMillis },
             (err, out) => {
                 if (err) {
                     if (options.showErrors) {
@@ -38,7 +39,7 @@ export function execShell(
             const stdinStream = new stream.Readable();
             stdinStream.push(options.input);  // Add data to the internal queue for users of the stream to consume
             stdinStream.push(null);   // Signals the end of the stream (EOF)
-            stdinStream.pipe(child.stdin);            
+            stdinStream.pipe(child.stdin);
         }
     });
 }

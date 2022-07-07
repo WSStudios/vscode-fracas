@@ -130,7 +130,7 @@ export async function precompileFracasFile(frcDoc: vscode.TextDocument | undefin
         // Invoke ninja to update all precompiled zo file dependencies
         const precompileNinjaFile = path.join("build", "build_precompile.ninja");
         const projectFolder = config.getProjectFolder();
-        
+
         try {
             // make sure build_precompile.ninja exists. Users with pre-built binaries may not have this file
             await vscode.workspace.fs.stat(vscode.Uri.joinPath(projectFolder.uri, precompileNinjaFile));
@@ -141,7 +141,12 @@ export async function precompileFracasFile(frcDoc: vscode.TextDocument | undefin
 
         const ninjaCmd = `"${ninja}" -f "${precompileNinjaFile}"`;
         config.fracasOut.appendLine(`Precompiling fracas files because ${frcDoc.fileName} has changed: ${ninjaCmd}`);
-        await utils.execShell(ninjaCmd, { workingDir: projectFolder.uri.fsPath, showErrors: false });
+        const execOpts = {
+            workingDir: projectFolder.uri.fsPath,
+            showErrors: false,
+            timeoutMillis: 240_000
+        };
+        await utils.execShell(ninjaCmd, execOpts);
     }
 }
 
@@ -166,7 +171,7 @@ export function showOutput(terminals: Map<string, vscode.Terminal>): void {
 }
 
 export async function formatFracasDocument(
-    frcDoc?: vscode.TextDocument, 
+    frcDoc?: vscode.TextDocument,
     options?: vscode.FormattingOptions,
     range?: vscode.Range | vscode.Position
 ): Promise<vscode.TextEdit[]> {
@@ -232,20 +237,20 @@ export async function formatFracasDocument(
 
 function _textEditsToDocumentEdits(
     editedText: string,
-    textEdits: vscode.TextEdit[], 
+    textEdits: vscode.TextEdit[],
     document: vscode.TextDocument,
-    documentPos: vscode.Position, 
+    documentPos: vscode.Position,
     newline = "\r\n",
     options?: vscode.FormattingOptions
 ): void {
     // offset the edits by the offset
-    const exprIndent = (options === undefined || options.insertSpaces) ? 
+    const exprIndent = (options === undefined || options.insertSpaces) ?
         " ".repeat(documentPos.character) :
         "\t".repeat(documentPos.character / options.tabSize) + " ".repeat(documentPos.character % options.tabSize);
     const editRanges = textEdits.map(edit => edit.range);
     // Translate text edit offsets to the position of the selected expression
     const documentRanges = editorLib.textRangesToDocumentRanges(editedText, editRanges, newline, document, documentPos);
-    
+
     for (let index = 0; index < textEdits.length; index++) {
         const edit = textEdits[index];
         edit.range = documentRanges[index];
