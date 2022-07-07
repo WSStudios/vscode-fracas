@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { LanguageClient, LanguageClientOptions } from "vscode-languageclient/node";
+import { DiagnosticSeverity, LanguageClient, LanguageClientOptions, TextDocumentContentChangeEvent } from "vscode-languageclient/node";
 import * as com from "./commands";
 import * as ue4 from "./ue4";
 import {
@@ -94,6 +94,8 @@ async function configurationChanged() {
     }
 }
 
+let diagnosticCollection: vscode.DiagnosticCollection;
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     // Each file has one output terminal and one repl
     // Those two are saved in terminals and repls, respectively
@@ -110,6 +112,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             com.makeStringTableImport();
         }
     }
+
+    vscode.workspace.onDidChangeTextDocument(changeEvent => {
+        const document = changeEvent.document;
+        if (document.languageId == 'fracas') {
+            diagnosticCollection.clear();
+            const range = document.getWordRangeAtPosition(
+                vscode.window.activeTextEditor?.selection.anchor ?? new vscode.Position(0,0),
+                /[#:\w\-+*.>/]+/);
+            if (range) {
+                const diagnostic = new vscode.Diagnostic(range, "Why'd you fuck this up?", DiagnosticSeverity.Warning);
+                diagnosticCollection.set(document.uri, [diagnostic]);
+            }
+        }
+    });
     vscode.workspace.onDidSaveTextDocument(async document => {
         if (document && document.languageId === "fracas") {
             await com.precompileFracasFile(document);
@@ -125,6 +141,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         terminals.forEach((val, key) => val === terminal && terminals.delete(key) && val.dispose());
         repls.forEach((val, key) => val === terminal && repls.delete(key) && val.dispose());
     });
+    // context.workspaceState.update()
+
 
     // Register RACKET commands
     context.subscriptions.push(
@@ -141,6 +159,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         reg("ue4OpenAsset", () => ue4.ue4OpenEditorsForAssets()));
 
     // Register FRACAS language support
+    diagnosticCollection = vscode.languages.createDiagnosticCollection('fracas');
+    context.subscriptions.push(diagnosticCollection);
     context.subscriptions.push(
         vscode.languages.registerDefinitionProvider(fracasDocumentFilter, new FracasDefinitionProvider()));
     context.subscriptions.push(
@@ -168,5 +188,4 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await configurationChanged(); // Start language server.
     watchProjectConfig(); // watch for wonderstorm .cfg file changes
     vscode.workspace.onDidChangeConfiguration(configurationChanged); // watch VS code config changes
-    
 }

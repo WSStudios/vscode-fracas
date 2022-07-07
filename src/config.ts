@@ -55,9 +55,15 @@ export async function loadProjectConfig(): Promise<void> {
             const config = ini.parse(cfg.toString());
             kCfgFiles.push(config);
         } catch {
-            vscode.window.showWarningMessage(`cfg file not found or unreadable: ${cfgUri.fsPath}`);
+            fracasOut.appendLine(`cfg file not found or unreadable: ${cfgUri.fsPath}`);
         }
     }
+
+    if (kCfgFiles.length === 0) {
+        const cfgFile = vscode.Uri.joinPath(projectFolder.uri, "cfg", "ws.cfg")
+        vscode.window.showErrorMessage(`cfg file not found or unreadable: ${cfgFile.fsPath}`);
+    }
+
 }
 
 let cfgWatcher: vscode.FileSystemWatcher;
