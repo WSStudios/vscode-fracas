@@ -6,12 +6,12 @@ import path = require("path");
 import * as vscode from "vscode";
 import { getProjectDir } from "../../config";
 import { getSelectedSymbol } from "../../editor-lib";
-import { 
+import {
     findAllImportDefinitions,
     findCompletions,
     findDefinition,
-    FracasDefinition, 
-    FracasDefinitionKind 
+    FracasDefinition,
+    FracasDefinitionKind
 } from "../../fracas/syntax";
 // import * as myExtension from '../../extension';
 
@@ -59,7 +59,7 @@ suite("Import Tests", () => {
 });
 suite("Find Definition Tests", () => {
     vscode.window.showInformationMessage("Start findDefinition tests.");
-    
+
     test("findDefinition resolves a named parameter", async () => {
         const { document } = await showFracasDocument(abilityFrc);
         const defs: FracasDefinition[] = await findDefinition(document, new vscode.Position(42, 38)); // cursor within "#:net-playback-mode"

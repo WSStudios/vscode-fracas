@@ -28,7 +28,7 @@ export function deactivate(): Promise<void> {
 }
 
 function setupLSP() {
-    
+
     withRacket((racket: string, racketArgs: string[]) => {
         const executable = {
             command: racket,
@@ -115,7 +115,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     vscode.workspace.onDidChangeTextDocument(changeEvent => {
         const document = changeEvent.document;
-        if (document.languageId == 'fracas') {
+        if (document.languageId === 'fracas') {
             diagnosticCollection.clear();
             const range = document.getWordRangeAtPosition(
                 vscode.window.activeTextEditor?.selection.anchor ?? new vscode.Position(0,0),

@@ -2,22 +2,22 @@ import path = require('path');
 import * as vscode from 'vscode';
 import { fracasOut, getProjectFolder } from '../config';
 import { flatten, mapAsync, uniqBy } from '../containers';
-import { 
-    findTextInFiles, 
-    getRange, 
-    getSelectedSymbol, 
-    resolvePosition, 
-    resolveRange, 
-    resolveSelection, 
-    resolveSymbol, 
-    searchBackward 
+import {
+    findTextInFiles,
+    getRange,
+    getSelectedSymbol,
+    resolvePosition,
+    resolveRange,
+    resolveSelection,
+    resolveSymbol,
+    searchBackward
 } from '../editor-lib';
-import { 
+import {
     matchAll,
     regexGroupDocumentLocation,
-    regexGroupUriLocation 
+    regexGroupUriLocation
 } from '../regular-expressions';
-import { 
+import {
     SearchKind,
     RX_COMMENT,
     anyConstructorRx,
@@ -36,7 +36,7 @@ import {
     enumMemberRx,
     importExpressionRx,
     importKeywordRx,
-    variantOptionRx 
+    variantOptionRx
 } from './syntax-regex';
 
 const KEYWORD_PREFIX = '#:';
@@ -246,9 +246,9 @@ function _memberDeclRx(
 ): RegExp {
     switch (fracasKind) {
         case (FracasDefinitionKind.define):
-            return new RegExp(memberName ? 
+            return new RegExp(memberName ?
                 anyNamedParamSymbolDeclarationRx(memberName, searchKind) :
-                anyNamedParamDeclarationRx(), 
+                anyNamedParamDeclarationRx(),
                 "gd");
         case (FracasDefinitionKind.key):
         case (FracasDefinitionKind.text):
@@ -315,16 +315,16 @@ export function findOpenBracket(
     let range = resolveRange(pos);
     // const firstChar = document.getText(new vscode.Range(range.start, range.start.translate(0, 1)));
     // const lastChar = document.getText(new vscode.Range(range.end, range.end.translate(0, -1)));
-    let nesting = 0; 
+    let nesting = 0;
     let minNesting = 0; // isCloseBracket(lastChar) && !isOpenBracket(firstChar) ? -1 : 0; // nudge nesting inside the expression
-    
+
     if (!range.isEmpty) {
         for (let lineNo = range.start.line; lineNo <= range.end.line; ++lineNo) {
             const line = document.lineAt(lineNo);
             for (
                 // First time through outer loop, initialize charNo to start of `range`. Thereafter use 0, the start of the line.
-                let charNo = (lineNo === range.start.line ? range.start.character : 0); 
-                charNo < (lineNo === range.end.line ? range.end.character : line.range.end.character); 
+                let charNo = (lineNo === range.start.line ? range.start.character : 0);
+                charNo < (lineNo === range.end.line ? range.end.character : line.range.end.character);
                 ++charNo
             ) {
                 const c = line.text[charNo];
@@ -347,7 +347,7 @@ export function findOpenBracket(
     if (isCloseBracket(document.getText(range.with({ end: range.start.translate(0, 1) })))) {
         range = range.with({ start: document.positionAt(document.offsetAt(range.start) - 1) });
     }
-    
+
     // rewind to opening bracket
     for (let lineNo = range.start.line; lineNo >= 0; --lineNo) {
         const line = document.lineAt(lineNo);
@@ -359,8 +359,8 @@ export function findOpenBracket(
         // scan backward from the start of the selection range to find the opening bracket
         for (
             // First time through outer loop, initialize charNo to selection `range` start. Thereafter use the end of the line.
-            let charNo = (lineNo === range.start.line ? range.start.character : line.range.end.character); 
-            charNo >= line.range.start.character; 
+            let charNo = (lineNo === range.start.line ? range.start.character : line.range.end.character);
+            charNo >= line.range.start.character;
             --charNo
         ) {
             const c = textBeforeComment[charNo];
@@ -614,7 +614,7 @@ export async function findVariantOptionDefinition(
 }
 
 /**
- * Find every file imported by a document. The "definition" of an import points to the 
+ * Find every file imported by a document. The "definition" of an import points to the
  * uri and position at the beginning of the imported file.
  * @param document the document to search
  * @returns a list of FracasDefinition for each file imported by this document
@@ -627,12 +627,13 @@ export function findAllImportDefinitions(
     // find all (import ...) expressions in the document
     const importExpressions = matchAll(importExprRx, document, 1);
 
-    // extract the import definitions from each expression, 
+    // extract the import definitions from each expression,
     // e.g. get defs for "unreal" and "abilities" from "(import unreal abilities)"
     const allImportDefs = importExpressions
-        .filter(expr => isWithinImport(document, expr.range.start)) // drop matches that are commented out
+        .filter(expr => isWithinImport(document, expr.range.start)) // drop matches outside an (import ...) expression
         .map(expr => {
             // extract the import symbols from the expression, e.g. get "unreal" from "(import unreal abilities)"
+            // eslint-disable-next-line no-empty-character-class
             const imports = matchAll(/([a-zA-Z-/]+)/gd, document, 0, expr.range);
             const importDefs = imports
                 .filter(imp => !_isCommentedOut(document, imp.range.start)) // drop comments
@@ -644,7 +645,7 @@ export function findAllImportDefinitions(
 }
 
 /**
- * Find a file imported by the symbol at the given position. The "definition" 
+ * Find a file imported by the symbol at the given position. The "definition"
  * of an import points to the  uri and position at the beginning of the imported file.
  * @param document the document to search
  * @param position a position within the import symbol
@@ -675,7 +676,7 @@ function _importToDefinition(importSymbol: string): FracasDefinition {
     const importDef = new FracasDefinition(
         new vscode.Location(importedUri, new vscode.Position(0, 0)),
         importSymbol, FracasDefinitionKind.import);
-    
+
     return importDef;
 }
 
@@ -822,7 +823,7 @@ export async function findReferences(
     if (!document || !position) {
         return [];
     }
-    
+
     const symbol = getSelectedSymbol(document, position);
     // Do a dumb search for all text matching the symbol
     const symbolRx = anySymbolRx(symbol);
@@ -907,7 +908,7 @@ async function _findCompletionsNonUnique(
     if (enumMatches.length > 0) {
         const enumCompletions = await _toCompletionItems(enumMatches, '', resolvedSymbol.range);
         return enumCompletions;
-    } 
+    }
 
     // try to auto-complete a member field name
     if (symbol.startsWith(KEYWORD_PREFIX)) {
@@ -922,7 +923,7 @@ async function _findCompletionsNonUnique(
             keywordDefs, KEYWORD_PREFIX, resolvedSymbol.range);
         fracasOut.appendLine(`Found ${keywordCompletions.length} keywords for ${symbol}`);
         return keywordCompletions;
-    } 
+    }
 
     // don't try to complete type definitions until at least three characters are typed
     if (position.character - resolvedSymbol.range.start.character < 3) {
@@ -935,7 +936,7 @@ async function _findCompletionsNonUnique(
     if (typeDefs.length === 0) {
         return null;
     }
-    
+
     // add the type definitions as completion items, e.g. "targeting-ga" => "targeting-gather"
     const typeCompletions = await _toCompletionItems(typeDefs, '', resolvedSymbol.range);
 
@@ -980,8 +981,8 @@ export async function findMembers(
     searchKind: SearchKind = SearchKind.wholeMatch
 ): Promise<FracasDefinition[]> {
     const document = await vscode.workspace.openTextDocument(fracasDef.location.uri);
-    
-    // find the text ranges of all member declarations 
+
+    // find the text ranges of all member declarations
     const scopeNestingDepth = _memberScopeDepth(fracasDef.kind);
     const ranges = await _rangesAtScope(document, fracasDef.location.range.start, scopeNestingDepth);
 
@@ -993,10 +994,10 @@ export async function findMembers(
     }
 
     // find members that match the given name
-    if (fracasDef.kind === FracasDefinitionKind.enum || fracasDef.kind === FracasDefinitionKind.mask) 
+    if (fracasDef.kind === FracasDefinitionKind.enum || fracasDef.kind === FracasDefinitionKind.mask)
     {
-        // short-circuit for enum and mask members: this is a hacky workaround because mask 
-        // members may be naked identifiers, or may be s-expressions that contain a single identifier with 
+        // short-circuit for enum and mask members: this is a hacky workaround because mask
+        // members may be naked identifiers, or may be s-expressions that contain a single identifier with
         // metadata. It's impossible to write a single regexp that handles both.
         const enumMembers = ranges.map(range =>
             _findEnumMembers(document, range, definitionMemberKind(fracasDef.kind), searchKind, memberName));
@@ -1006,7 +1007,7 @@ export async function findMembers(
         const members = ranges.map(range => {
             // search at this scope for members
             const matches = matchAll(fieldRx, document, 1, range);
-            return matches.map(match => 
+            return matches.map(match =>
                 new FracasDefinition(match, document.getText(match.range), definitionMemberKind(fracasDef.kind)));
         });
         return flatten(members);
@@ -1032,10 +1033,10 @@ function _findEnumMembers(
         lineMatch = newlineRx.exec(enumBody);
         const lineEndPos = lineMatch ? (lineMatch.index + lineMatch[0].length) : enumBody.length;
         const line = enumBody.substring(lineStartPos, lineEndPos);
-        
+
         // extract first identifier from the line. Discard leading space and parentheses
         const enumMemberMatch = ENUM_MEMBER_RX.exec(line);
-        
+
         // if the enum member matches the given memberName, add it to the list of members
         if (enumMemberMatch && _symbolsMatch(nameToSearchFor, enumMemberMatch[1], searchKind)) {
             const enumMemberName = enumMemberMatch[1];

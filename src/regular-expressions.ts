@@ -9,7 +9,7 @@ import * as vscode from 'vscode';
  * @returns locations of matches initialized with the document URI and the range of the extracted capture group.
  */
 export function matchAll(
-    searchRx: RegExp, 
+    searchRx: RegExp,
     document: vscode.TextDocument,
     group: number,
     range?: vscode.Range
@@ -19,12 +19,12 @@ export function matchAll(
     const rangeOffset = range ? document.offsetAt(range.start) : 0;
     const locations = [];
     // for (let match = exec(searchRx, text); match; match = searchRx.global ? exec(searchRx, text) : null) {
-    for (let match of text.matchAll(searchRx)) {
+    for (const match of text.matchAll(searchRx)) {
         // convert the match offsets to a document range
         const matchOffset = (match.index ?? 0);
         const [start, end] = match.indices ? match.indices[group] : [matchOffset, matchOffset + match[group].length]
         const groupRange = new vscode.Range(
-            document.positionAt(rangeOffset + start), 
+            document.positionAt(rangeOffset + start),
             document.positionAt(rangeOffset + end));
         locations.push(new vscode.Location(document.uri, groupRange));
     }
@@ -56,7 +56,7 @@ export function escapeForRegEx(s: string): string {
 }
 
 /**
- * Find the document location covering a group within a regex match. For example, given 
+ * Find the document location covering a group within a regex match. For example, given
  * /\((define-type)\s*(cool-stuff))/,
  * calculate the range around "cool-stuff".
  * @param match The expression containing a group to locate.
@@ -80,7 +80,7 @@ export function escapeForRegEx(s: string): string {
 
     // convert the match offsets to a document range
     const groupRange = new vscode.Range(
-        document.positionAt(groupOffset), 
+        document.positionAt(groupOffset),
         document.positionAt(groupOffset + match[group].length));
     return new vscode.Location(document.uri, groupRange);
 }
