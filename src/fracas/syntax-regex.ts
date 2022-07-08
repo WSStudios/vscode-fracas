@@ -5,12 +5,34 @@ export enum SearchKind {
     partialMatch
 }
 
-export const RX_CHARS_OPEN_PAREN = '\\(|\\{|\\[';
-export const RX_CHARS_CLOSE_PAREN = '\\)|\\}|\\]';
-export const RX_CHARS_SPACE = '\\s|\\r|\\n';
+export const RX_ALL_DEFINED_OUT = '\(all-defined-out\)'
 export const RX_CHAR_IDENTIFIER = '[\\w\\-\\*\\.]';
-export const RX_SYMBOLS_DEFINE = 'define-enum|define-game-data|define-key|define-text|define-string-table|define-mask|define-type-optional|define-syntax|define-syntax-rule|define-type|define-variant|define|define-list';
+export const RX_CHARS_CLOSE_PAREN = '\\)|\\}|\\]';
+export const RX_CHARS_OPEN_PAREN = '\\(|\\{|\\[';
+export const RX_CHARS_SPACE = '\\s|\\r|\\n';
 export const RX_COMMENT = ';;?\\s*(.*)\\s*$';
+export const RX_EXCEPT_OUT = '\\(except-out\\s+\\(\\s*all-defined-out\\s*\\)';
+export const RX_EXCEPT_OUT_EXPR = `${RX_EXCEPT_OUT}[\\s\\n]+([^\\)]+)\\)`;
+export const RX_IDENTIFIER = `(${RX_CHAR_IDENTIFIER}+)`
+export const RX_SYMBOLS_DEFINE = 'define-enum|define-game-data|define-key|define-text|define-string-table|define-mask|define-type-optional|define-syntax|define-syntax-rule|define-type|define-variant|define|define-list';
+/**
+ * A regex that matches an expression within the body of a "(provide ...", one of the forms:
+ * (provide (all-defined-out))
+ * 
+ * (provide 
+ *  some-bare-identifier 
+ *  another-bare-identifier)
+ * 
+ * (provide
+ *  (except-out (all-defined-out)
+ *              ;; forward declared types
+ *              action-block
+ *              damage-data
+ *              projectile-data
+ *              ))
+ * 
+ */
+export const RX_PROVIDED_EXPRESSION = `(${RX_CHAR_IDENTIFIER}+|${RX_EXCEPT_OUT_EXPR}|${RX_ALL_DEFINED_OUT})`;
 
 export function anySymbolRx(symbol: string): string {
     return `(?<!${RX_CHAR_IDENTIFIER})(${escapeForRegEx(symbol)})(?!${RX_CHAR_IDENTIFIER})`;
@@ -65,6 +87,13 @@ export function importExpressionRx(): string {
     return `${importKeywordRx()}[\\s\\n]+([^${RX_CHARS_CLOSE_PAREN}]+)(?=[${RX_CHARS_CLOSE_PAREN}])`;
 }
 
+/**
+ * @returns a regex that matches a provide declaration such as "(provide ..."
+ */
+ export function provideKeywordRx(): string {
+    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*provide\\b`;
+}
+
 export function anyFieldSymbolDeclarationRx(fieldName: string, searchKind = SearchKind.wholeMatch): string {
     return searchKind === SearchKind.wholeMatch ?
         `(?<=^\\s*[${RX_CHARS_OPEN_PAREN}])\\s*(${escapeForRegEx(fieldName)})(?!${RX_CHAR_IDENTIFIER})` :
@@ -94,7 +123,7 @@ export function anyIdentifierRx(fieldName: string, searchKind = SearchKind.whole
         return `(?<!${RX_CHAR_IDENTIFIER})(${escapeForRegEx(fieldName)})(?!${RX_CHAR_IDENTIFIER})`;
     } else {
         // if the field name isn't empty, find anything starting with the name. Otherwise, find 1 or more identifier chars.
-        const fieldExpr = fieldName ? `(${escapeForRegEx(fieldName)}${RX_CHAR_IDENTIFIER}*)` : `(${RX_CHAR_IDENTIFIER}+)`;
+        const fieldExpr = fieldName ? `(${escapeForRegEx(fieldName)}${RX_CHAR_IDENTIFIER}*)` : RX_IDENTIFIER;
         // // This ensures that identifiers appear either at the very beginning of an s-expression, e.g. "(some-identifier...)"
         // // or are naked identifiers (not enclosed within an s-expression), e.g. "some-identifier another-identifier third-id"
         // return `(?:[${RX_CHARS_OPEN_PAREN}]\\s*|[^${RX_CHARS_OPEN_PAREN}]*)${fieldExpr}`;

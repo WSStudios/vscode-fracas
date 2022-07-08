@@ -18,8 +18,6 @@ import {
     regexGroupUriLocation
 } from '../regular-expressions';
 import {
-    SearchKind,
-    RX_COMMENT,
     anyConstructorRx,
     anyDefineRx,
     anyDefineSymbolRx,
@@ -36,7 +34,14 @@ import {
     enumMemberRx,
     importExpressionRx,
     importKeywordRx,
-    variantOptionRx
+    provideKeywordRx,
+    RX_ALL_DEFINED_OUT,
+    RX_COMMENT,
+    RX_EXCEPT_OUT,
+    RX_IDENTIFIER,
+    RX_PROVIDED_EXPRESSION,
+    SearchKind,
+    variantOptionRx,
 } from './syntax-regex';
 
 const KEYWORD_PREFIX = '#:';
@@ -61,31 +66,19 @@ export enum FracasDefinitionKind {
 }
 
 export class FracasDefinition {
-
     /**
-     * The location of the definition.
+     * @param location - The location of the definition.
+     * @param symbol - The name of the type defined by this definition.
+     * @param kind - The type of definition -- enum, variant, mask, etc.
+     * @param completionKind - The kind of the item for intellisense auto-completion.
      */
-    readonly location: vscode.Location;
-
-    /**
-     * The name of the type defined by this definition.
-     */
-    readonly symbol: string;
-
-    /**
-     * The type of definition -- enum, variant, mask, etc.
-     */
-    readonly kind: FracasDefinitionKind;
-
-    readonly completionKind: vscode.CompletionItemKind;
-
-    constructor(definition: vscode.Location, symbol: string, kind: FracasDefinitionKind) {
-        this.location = definition;
-        this.symbol = symbol;
-        this.kind = kind;
-        this.completionKind = completionKind(kind);
+     constructor(
+        readonly location: vscode.Location, 
+        readonly symbol: string, 
+        readonly kind: FracasDefinitionKind,
+        readonly completionKind: vscode.CompletionItemKind = completionItemKind(kind))
+    {
     }
-
 }
 
 export function definitionKind(defToken: string): FracasDefinitionKind {
@@ -137,7 +130,7 @@ export function definitionMemberKind(typeKind: FracasDefinitionKind): FracasDefi
     }
 }
 
-export function completionKind(fracasKind: FracasDefinitionKind): vscode.CompletionItemKind {
+export function completionItemKind(fracasKind: FracasDefinitionKind): vscode.CompletionItemKind {
     switch (fracasKind) {
         case (FracasDefinitionKind.enum):
         case (FracasDefinitionKind.mask):
@@ -642,6 +635,99 @@ export function findAllImportDefinitions(
         });
 
     return flatten(allImportDefs);
+}
+
+/**
+ * Find identifiers defined in a document and provided via a "(provide ...)" expression.
+ * Note that transitively provided identifiers are excluded. For example, imagine a
+ * module `stereo` and `car`: 
+ * ;; stero.frc
+ * (provide volume)
+ * (define volume ...)
+ * ;; car.frc
+ * (import stero) 
+ * (provide (all-defined-out)):
+ * 
+ * `car` transitively provides `volume` via `stereo`, but this method will exclude 
+ * `volume` from results because it is not locally defined in `car`.
+ * @param document the document to search
+ * @returns a list of FracasDefinition for each file imported by this document
+ */
+ export async function findProvidedLocalIdentifiers(
+    document: vscode.TextDocument,
+    token?: vscode.CancellationToken
+): Promise<Map<string, boolean>> {
+    const symbols = await findDocumentSymbols(document.uri, token); // all identifiers defined in the document
+    const providedIds = new Map(symbols.map(sym => [sym.name, false])); // initially map all identifiers to false (not provided)
+
+    // find (provide ...) expression in the document
+    const provideRx = new RegExp(provideKeywordRx());
+    const provideMatch = provideRx.exec(document.getText());
+    if (!provideMatch) {
+        return providedIds;
+    }
+
+    // extract text of the (provide ...) expression
+    const provideExprRange = findEnclosingExpression(document, document.positionAt(provideMatch.index), false);
+    if (!provideExprRange) {
+        return providedIds;
+    }
+
+    // get the body of the (provide ...) expression, omitting the `provide` keyword
+    const provideBodyRange = provideExprRange.with(provideExprRange.start.translate(0, provideMatch[0].length));
+
+    // extract the provide expressions from the body of the (provide ...)
+    const providedExprRx = new RegExp(RX_PROVIDED_EXPRESSION, "gd");
+    const provideMatches = matchAll(providedExprRx, document, 0, provideBodyRange);
+    const provides = provideMatches.filter(provide => !_isCommentedOut(document, provide.range.start)); // drop comments
+
+    // extract the provided identifiers from each provide expression, e.g. get "some-identifier" from "(provide some-identifier)"
+    const exceptOutRx = new RegExp(RX_EXCEPT_OUT);
+    const allDefinedOutRx = new RegExp(RX_ALL_DEFINED_OUT);
+    const identifierRx = new RegExp(RX_IDENTIFIER, "gd");
+    for (const provideLoc of provides) {
+        const provide = document.getText(provideLoc.range)
+        const exceptOutMatch = exceptOutRx.exec(provide);
+        // NOTE: except-out check must come first or "allDefinedOutRx" will match the "all-defined-out" in the "except-out" body.
+        if (exceptOutMatch) {
+            // handle special case of except-out: it provides all except a list of identifiers
+            // (provide
+            //  (except-out (all-defined-out)
+            //              ;; forward declared types
+            //              action-block
+            //              damage-data
+            //              projectile-data
+            //              ))
+            // find the document offset of the except-out body in (except-out (all-defined-out) <except-out body>)
+            const exceptOutBodyOffset = document.offsetAt(provideLoc.range.start) + exceptOutMatch.index + exceptOutMatch.length;
+            const exceptOutBodyRange = provideLoc.range.with(provideLoc.range.start.translate(0, exceptOutBodyOffset));
+            const exceptedIds = matchAll(identifierRx, document, 0, exceptOutBodyRange)
+                .filter(except => !_isCommentedOut(document, except.range.start)) // drop comments
+                .map(except => document.getText(except.range));
+
+            // mark all identifiers as provided but the exceptions
+            for (const id of providedIds.keys()) {
+                providedIds.set(id, !exceptedIds.includes(id));
+            }
+        } else if (allDefinedOutRx.test(provide)) {
+            // all-defined-out is a special case: it provides all identifiers defined in the document
+            for (const id of providedIds.keys()) {
+                providedIds.set(id, true);
+            }
+        } else {
+            // A bare identifier is provided
+            providedIds.set(provide, true);
+        } 
+    }
+
+    return providedIds;
+}
+
+
+export function findAllIdentifiers(document: vscode.TextDocument): vscode.Location[] {
+    const identifierRx = new RegExp(RX_IDENTIFIER, "gd");
+    const identifiers = matchAll(identifierRx, document, 1);
+    return identifiers;
 }
 
 /**
