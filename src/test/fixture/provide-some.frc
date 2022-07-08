@@ -1,0 +1,35 @@
+#lang fracas
+
+(import
+ fracas/provide-some
+ unreal-defines
+ )
+
+(provide 
+ not-hidden-enum
+ ;; commented-type
+ *visible-to-all*
+ )
+
+(define-enum hidden-enum
+  (
+   secrets
+   are
+   private
+   )
+  )
+
+(define-enum not-hidden-enum
+  (
+   visible
+   everywhere
+   )
+  )
+
+(define *visible-to-all* (enum not-hidden-enum visible))
+(define-type commented-type
+  (
+   (is-provided bool #:default #f)
+   (some-float float)
+   )
+  )

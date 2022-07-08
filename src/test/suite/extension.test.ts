@@ -10,6 +10,7 @@ import {
     findAllImportDefinitions,
     findCompletions,
     findDefinition,
+    findProvidedLocalIdentifiers,
     FracasDefinition,
     FracasDefinitionKind
 } from "../../fracas/syntax";
@@ -30,6 +31,11 @@ const collisionDefinesFrc = path.join(testFixtureDir, 'collision-defines.frc');
 const abilityFrc = path.join(testFixtureDir, 'ability.frc');
 const abilityDataDefinesFrc = path.join(testFixtureDir, 'ability-data-defines.frc');
 const abilityActionDefinesFrc = path.join(testFixtureDir, 'ability-action-defines.frc');
+
+const provideSomeFrc = path.join(testFixtureDir, 'provide-some.frc');
+const provideAllFrc = path.join(testFixtureDir, 'provide-all.frc');
+const provideExceptOutFrc = path.join(testFixtureDir, 'provide-except-out.frc');
+
 
 suite("Editor Lib Tests", () => {
     vscode.window.showInformationMessage("Start editor lib tests.");
@@ -57,6 +63,37 @@ suite("Import Tests", () => {
         assert.deepStrictEqual(importSymbols, ["fracas/utils/ws-math", "unreal-defines"] );
     });
 });
+
+suite("Provide Tests", () => {
+    vscode.window.showInformationMessage("Start import tests.");
+
+    test("findProvidedLocalIdentifiers finds explicit provide identifiers", async () => {
+        const { document, editor } = await showFracasDocument(provideSomeFrc);
+        const provides = await findProvidedLocalIdentifiers(document);
+        assert.ok(provides.get("not-hidden-enum"));
+        assert.ok(!provides.get("commented-type"));
+        assert.ok(provides.get("*visible-to-all*"));
+    });
+
+    test("findProvidedLocalIdentifiers finds local identifiers for (all-defined-out)", async () => {
+        const { document, editor } = await showFracasDocument(provideAllFrc);
+        const provides = await findProvidedLocalIdentifiers(document);
+        assert.ok(!provides.get("not-hidden-enum"), "transitively provided `not-hidden-enum` is not a local identifier");
+        assert.ok(provides.get("provided-enum"));
+        assert.ok(provides.get("*goodbye*"));
+        assert.ok(provides.get("provided-type"));
+    });
+
+    test("findProvidedLocalIdentifiers finds excludes excepted identifiers for (except-out)", async () => {
+        const { document, editor } = await showFracasDocument(provideExceptOutFrc);
+        const provides = await findProvidedLocalIdentifiers(document);
+        assert.ok(!provides.get("exceptional-enum"), "except-out identifier should be excluded");
+        assert.ok(provides.get("not-exceptional-enum"));
+        assert.ok(provides.get("*not-special*"));
+    });
+
+});
+
 suite("Find Definition Tests", () => {
     vscode.window.showInformationMessage("Start findDefinition tests.");
 

@@ -1,0 +1,24 @@
+#lang fracas
+
+(import
+ fracas/provide-some
+ unreal-defines
+ )
+
+(provide (all-defined-out))
+
+(define-enum provided-enum
+  (
+   hello
+   goodbye
+   go-away
+   )
+  )
+
+(define *goodbye* (enum provided-enum goodbye))
+(define-type provided-type
+  (
+   (is-provided bool #:default #t) ;; enable to draw the collision shape at runtime - useful when prototyping and checking overlap sizes, or if you don't have art yet indicating the collision size
+   (some-number int)
+   )
+  )

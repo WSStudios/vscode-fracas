@@ -1,0 +1,29 @@
+#lang fracas
+
+(import
+ unreal-defines
+ )
+
+(provide
+ (except-out (all-defined-out)
+             ;; forward declared types
+             exceptional-enum
+             ))
+
+(define-enum exceptional-enum
+  (
+   everybody
+   except
+   this-one
+   )
+  )
+
+(define-enum not-exceptional-enum
+  (
+   not-exceptional
+   doesnt-mean
+   not-special
+   )
+  )
+
+(define *not-special* (enum not-exceptional-enum not-special))
