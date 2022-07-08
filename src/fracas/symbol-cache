@@ -1,0 +1,127 @@
+import * as vscode from "vscode";
+import {
+    findProjectFiles
+} from '../editor-lib'
+import {
+    FracasDefinition,
+    findAllIdentifiers,
+    findAllImportDefinitions
+} from './syntax'
+
+class FileState {
+    constructor(
+        public readonly stat: vscode.FileStat,
+        public readonly importedPaths: string[],
+        public readonly identifiers: string[],
+        public readonly providedIdentifiers: string[])
+    {}
+}
+
+function _fileStateKey(fsPath: string): string {
+    return `fs@${fsPath}`;
+}
+
+function _identifierKey(identifier: string): string {
+    return `id@${identifier}`;
+}
+
+function _importKey(importPath: string): string {
+    return `imp@${importPath}`;
+}
+
+export class FracasSymbolCache {
+    constructor(private storage: vscode.Memento) {}
+
+    async updateAll(): Promise<void> {
+        // collect fracas files currently in the project, and cache entries
+        const fileUris = await findProjectFiles();
+        
+        // remove cache entries for files that are gone
+        const curPaths = new Set(fileUris.map(uri => uri.fsPath)) // the file path is the cache key
+        const removed = this.getFilePaths().filter(cachedPath => !curPaths.has(cachedPath));
+        for (const path of removed) {
+            this.removeFileState(path);
+        }
+        
+        // update missing and stale cache entries
+        await Promise.all(fileUris.map(this._refreshFileStateForUri));
+     }
+
+    getFilePaths(): string[] {
+        return this.storage.keys().filter(key => key.startsWith('fs@'));
+    }
+
+    hasFileState(path: string): boolean {
+        return path in this.storage.keys();
+    }
+
+    getFileState(path: string): FileState | undefined {
+        return this.storage.get<FileState>(_fileStateKey(path));
+    }
+
+    getFileStateTimestamp(path: string): number {
+        const entry = this.getFileState(path);
+        return entry?.stat.mtime ?? 0
+    }
+
+    updateFileState(document: vscode.TextDocument, stat: vscode.FileStat): void {
+        this.removeFileState(document.fileName); // clear stale cache data
+
+        const imports = findAllImportDefinitions(document);
+        const importedPaths = imports.map(imp => imp.location.uri.fsPath);
+        const identifierDefs = findAllIdentifiers(document);
+        const identifiers = identifierDefs.map(id => document.getText(id.range));
+
+        // cache reverse map of file identifiers
+        for (const identifier of identifiers) {
+            this._setFilePathForIdentifier(identifier, document.fileName);
+        }
+
+        const newFileState = new FileState(stat, importedPaths, identifiers, [] /* TODO */);
+        this.storage.update(document.uri.fsPath, newFileState);
+    }
+
+    removeFileState(path: string): void {
+        const entry = this.getFileState(path);
+        // remove all identifiers for this file
+        if (entry) {
+            for (const identifier of entry.identifiers) {
+                this.storage.update(_identifierKey(identifier), undefined);
+            }
+        }
+
+        this.storage.update(path, undefined); // clear the entry.
+    }
+
+    private _getImportedIdentifiersRecursive(path: string, pathsSeen: Set<string>, identifiers: Set<string>): void {
+        if (pathsSeen.has(path)) {
+            return;
+        }
+        pathsSeen.add(path);
+        const fileState = this.getFileState(path);
+        if (fileState) {
+            for (const identifier of fileState.providedIdentifiers) {
+                identifiers.add(identifier);
+            }
+            for (const importedPath of fileState.importedPaths) {
+                this._getImportedIdentifiersRecursive(importedPath, pathsSeen, identifiers);
+            }
+        }
+    }
+
+    getFilePathForIdentifier(identifier: string): string | undefined {
+        return this.storage.get<string>(_identifierKey(identifier));
+    }
+
+    private _setFilePathForIdentifier(identifier: string, path: string): void {
+        this.storage.update(_identifierKey(identifier), path);
+    }
+
+    private async _refreshFileStateForUri(uri: vscode.Uri): Promise<void> {
+        const stat = await vscode.workspace.fs.stat(uri);
+        if (!this.hasFileState(uri.fsPath) || stat.mtime > this.getFileStateTimestamp(uri.fsPath)) {
+            const document = await vscode.workspace.openTextDocument(uri);
+            this.updateFileState(document, stat);
+        }
+    }
+}

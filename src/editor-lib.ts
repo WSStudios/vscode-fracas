@@ -6,6 +6,11 @@ import {
 } from './config';
 import { lastMatch } from './regular-expressions';
 
+export async function findProjectFiles(pattern: string = '**/*.frc'): Promise<vscode.Uri[]> {
+    const files = vscode.workspace.findFiles(new vscode.RelativePattern(getProjectFolder(), pattern));
+    return files;
+}
+
 /**
  * Search many documents to find matches for a regular expression.
  * @param searchRx The regular expression used to search files

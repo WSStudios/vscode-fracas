@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { DiagnosticSeverity, LanguageClient, LanguageClientOptions, TextDocumentContentChangeEvent } from "vscode-languageclient/node";
+import { DiagnosticSeverity, LanguageClient, LanguageClientOptions } from "vscode-languageclient/node";
 import * as com from "./commands";
 import * as ue4 from "./ue4";
 import {
@@ -113,21 +113,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }
     }
 
-    vscode.workspace.onDidChangeTextDocument(changeEvent => {
-        const document = changeEvent.document;
-        if (document.languageId === 'fracas') {
-            diagnosticCollection.clear();
+    // vscode.workspace.onDidChangeTextDocument(changeEvent => {
+    //     const document = changeEvent.document;
+    //     if (document.languageId === 'fracas') {
+    //         diagnosticCollection.clear();
+    //         const range = document.getWordRangeAtPosition(
+    //             vscode.window.activeTextEditor?.selection.anchor ?? new vscode.Position(0,0),
+    //             /[#:\w\-+*.>/]+/);
+    //         if (range) {
+    //             const diagnostic = new vscode.Diagnostic(range, "Why'd you fuck this up?", DiagnosticSeverity.Warning);
+    //             diagnosticCollection.set(document.uri, [diagnostic]);
+    //         }
+    //     }
+    // });
+    
+    vscode.workspace.fs.stat
+    vscode.workspace.onDidSaveTextDocument(async document => {
+        if (document && document.languageId === "fracas") {
+            // diagnosticCollection.clear();
             const range = document.getWordRangeAtPosition(
                 vscode.window.activeTextEditor?.selection.anchor ?? new vscode.Position(0,0),
                 /[#:\w\-+*.>/]+/);
+            
             if (range) {
                 const diagnostic = new vscode.Diagnostic(range, "Why'd you fuck this up?", DiagnosticSeverity.Warning);
                 diagnosticCollection.set(document.uri, [diagnostic]);
             }
-        }
-    });
-    vscode.workspace.onDidSaveTextDocument(async document => {
-        if (document && document.languageId === "fracas") {
+            
             await com.precompileFracasFile(document);
             _maybeUpdateStringTables([document.uri]);
         }
