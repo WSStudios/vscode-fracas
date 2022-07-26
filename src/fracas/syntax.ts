@@ -65,6 +65,47 @@ export enum FracasDefinitionKind {
     unknown
 }
 
+
+export enum FracasProvideKind {
+    provideAllDefined,
+    provideAllExcept,
+    provideExplicit
+}
+
+/** 
+ * An object describing the content of a fracas document's `(provide ...)` expression in one of the forms:
+ * `provideAllDefined`
+ * (provide (all-defined-out))
+ * 
+ * `provideAllExcept`
+ * (provide
+ *  (except-out (all-defined-out)
+ *              ;; forward declared types
+ *              action-block
+ *              damage-data
+ *              projectile-data
+ *              ))
+ * 
+ * `provideExplicit`
+ * (provide 
+ *  some-explicit-identifier 
+ *  another-explicit-identifier)
+ * 
+ **/
+export class FracasProvide {
+    /**
+     * @param provideKind - The form of the provide expression
+     * @param identifiers - The identifiers explicitly named in the provide expression body. 
+     * Refer to the `provideKind` to determine if the identifiers were explicitly included or 
+     * excluded from the provision.
+     */
+     constructor(
+        readonly provideKind: FracasProvideKind, 
+        readonly identifiers: string[])
+    {
+    }
+}
+
 export class FracasDefinition {
     /**
      * @param location - The location of the definition.
@@ -651,26 +692,68 @@ export function findAllImportDefinitions(
  * `car` transitively provides `volume` via `stereo`, but this method will exclude 
  * `volume` from results because it is not locally defined in `car`.
  * @param document the document to search
+ * @param token a cancellation token to abort the search
  * @returns a list of FracasDefinition for each file imported by this document
  */
- export async function findProvidedLocalIdentifiers(
+ export async function findLocalIdentifiers(
     document: vscode.TextDocument,
     token?: vscode.CancellationToken
-): Promise<Map<string, boolean>> {
-    const symbols = await findDocumentSymbols(document.uri, token); // all identifiers defined in the document
-    const providedIds = new Map(symbols.map(sym => [sym.name, false])); // initially map all identifiers to false (not provided)
+): Promise<{ publicIds: string[], privateIds: string[] }> {
+    // get all identifiers defined in the document
+    const documentIdentifiers = (await findDocumentSymbols(document.uri, token)).map(s => s.name);
+    const partitionedIdentifiers = partitionIdentifiersByVisibility(document, documentIdentifiers);
+    return partitionedIdentifiers;
+}
 
+/**
+ * Parse the `(provide ...)` expression to find the list of identifiers provided, and 
+ * use the result to segregate a list of identifiers into public (provided) and private identifiers.
+ * @param document the document from which to parse the `(provide ...)` expression
+ * @param documentIdentifiers identifiers to partition by visibility
+ * @returns The documentIdentifiers separated into public and private identifiers
+ */
+export function partitionIdentifiersByVisibility(
+    document: vscode.TextDocument,
+    documentIdentifiers: string[]
+): { publicIds: string[], privateIds: string[] } {
+    const provides = findProvidedIdentifiers(document);
+    switch (provides.provideKind) {
+        case FracasProvideKind.provideAllDefined:
+            // provide all identifiers.
+            return { publicIds: documentIdentifiers, privateIds: [] };
+        case FracasProvideKind.provideAllExcept:
+            // mark all identifiers as provided but the exceptions
+            return { // provide all but the explicitly named identifiers
+                publicIds: documentIdentifiers.filter(id => !provides.identifiers.includes(id)),
+                privateIds: provides.identifiers
+            };
+        default:
+            return { // provide only the explicitly named identifiers
+                publicIds: provides.identifiers,
+                privateIds: documentIdentifiers.filter(id => !provides.identifiers.includes(id))
+            };
+    }
+}
+
+/**
+ * Parse the `(provide ...)` expression naming which symbol definition identifiers are exported.
+ * @param document A fracas document that provides symbol definitions.
+ * @returns A FracasProvide object describing the symbols provided by the document.
+ */
+export function findProvidedIdentifiers(
+    document: vscode.TextDocument,
+): FracasProvide {
     // find (provide ...) expression in the document
     const provideRx = new RegExp(provideKeywordRx());
     const provideMatch = provideRx.exec(document.getText());
-    if (!provideMatch) {
-        return providedIds;
+    if (!provideMatch) { // provide nothing.
+        return new FracasProvide(FracasProvideKind.provideExplicit, []);
     }
 
     // extract text of the (provide ...) expression
     const provideExprRange = findEnclosingExpression(document, document.positionAt(provideMatch.index), false);
-    if (!provideExprRange) {
-        return providedIds;
+    if (!provideExprRange) { // provide nothing
+        return new FracasProvide(FracasProvideKind.provideExplicit, []);
     }
 
     // get the body of the (provide ...) expression, omitting the `provide` keyword
@@ -685,6 +768,7 @@ export function findAllImportDefinitions(
     const exceptOutRx = new RegExp(RX_EXCEPT_OUT);
     const allDefinedOutRx = new RegExp(RX_ALL_DEFINED_OUT);
     const identifierRx = new RegExp(RX_IDENTIFIER, "gd");
+    const providedIds: string[] = []
     for (const provideLoc of provides) {
         const provide = document.getText(provideLoc.range)
         const exceptOutMatch = exceptOutRx.exec(provide);
@@ -701,28 +785,22 @@ export function findAllImportDefinitions(
             // find the document offset of the except-out body in (except-out (all-defined-out) <except-out body>)
             const exceptOutBodyOffset = document.offsetAt(provideLoc.range.start) + exceptOutMatch.index + exceptOutMatch.length;
             const exceptOutBodyRange = provideLoc.range.with(provideLoc.range.start.translate(0, exceptOutBodyOffset));
-            const exceptedIds = matchAll(identifierRx, document, 0, exceptOutBodyRange)
+            const privateIds = matchAll(identifierRx, document, 0, exceptOutBodyRange) // extract excepted identifiers
                 .filter(except => !_isCommentedOut(document, except.range.start)) // drop comments
-                .map(except => document.getText(except.range));
+                .map(except => document.getText(except.range)); // get the identifier name
 
             // mark all identifiers as provided but the exceptions
-            for (const id of providedIds.keys()) {
-                providedIds.set(id, !exceptedIds.includes(id));
-            }
+            return new FracasProvide(FracasProvideKind.provideAllExcept, privateIds);
         } else if (allDefinedOutRx.test(provide)) {
             // all-defined-out is a special case: it provides all identifiers defined in the document
-            for (const id of providedIds.keys()) {
-                providedIds.set(id, true);
-            }
+            return new FracasProvide(FracasProvideKind.provideAllDefined, []);
         } else {
             // A bare identifier is provided
-            providedIds.set(provide, true);
+            providedIds.push(provide);
         } 
     }
-
-    return providedIds;
+    return new FracasProvide(FracasProvideKind.provideExplicit, providedIds);
 }
-
 
 export function findAllIdentifiers(document: vscode.TextDocument): vscode.Location[] {
     const identifierRx = new RegExp(RX_IDENTIFIER, "gd");
@@ -937,7 +1015,7 @@ export async function findDocumentSymbols(
 }
 
 export async function findWorkspaceSymbols(
-    symbol: string,
+    symbol?: string,
     token?: vscode.CancellationToken
 ): Promise<vscode.SymbolInformation[]> {
     return _findSymbols(symbol, undefined, token);

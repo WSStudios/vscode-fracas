@@ -10,7 +10,7 @@ import {
     findAllImportDefinitions,
     findCompletions,
     findDefinition,
-    findProvidedLocalIdentifiers,
+    findLocalIdentifiers,
     FracasDefinition,
     FracasDefinitionKind
 } from "../../fracas/syntax";
@@ -69,27 +69,27 @@ suite("Provide Tests", () => {
 
     test("findProvidedLocalIdentifiers finds explicit provide identifiers", async () => {
         const { document, editor } = await showFracasDocument(provideSomeFrc);
-        const provides = await findProvidedLocalIdentifiers(document);
-        assert.ok(provides.get("not-hidden-enum"));
-        assert.ok(!provides.get("commented-type"));
-        assert.ok(provides.get("*visible-to-all*"));
+        const { publicIds, privateIds } = await findLocalIdentifiers(document);
+        assert.ok(publicIds.includes("not-hidden-enum"));
+        assert.ok(privateIds.includes("commented-type"));
+        assert.ok(publicIds.includes("*visible-to-all*"));
     });
 
     test("findProvidedLocalIdentifiers finds local identifiers for (all-defined-out)", async () => {
         const { document, editor } = await showFracasDocument(provideAllFrc);
-        const provides = await findProvidedLocalIdentifiers(document);
-        assert.ok(!provides.get("not-hidden-enum"), "transitively provided `not-hidden-enum` is not a local identifier");
-        assert.ok(provides.get("provided-enum"));
-        assert.ok(provides.get("*goodbye*"));
-        assert.ok(provides.get("provided-type"));
+        const { publicIds, privateIds } = await findLocalIdentifiers(document);
+        assert.ok(!publicIds.includes("not-hidden-enum"), "transitively provided `not-hidden-enum` is not a local identifier");
+        assert.ok(publicIds.includes("provided-enum"));
+        assert.ok(publicIds.includes("*goodbye*"));
+        assert.ok(publicIds.includes("provided-type"));
     });
 
     test("findProvidedLocalIdentifiers finds excludes excepted identifiers for (except-out)", async () => {
         const { document, editor } = await showFracasDocument(provideExceptOutFrc);
-        const provides = await findProvidedLocalIdentifiers(document);
-        assert.ok(!provides.get("exceptional-enum"), "except-out identifier should be excluded");
-        assert.ok(provides.get("not-exceptional-enum"));
-        assert.ok(provides.get("*not-special*"));
+        const { publicIds, privateIds } = await findLocalIdentifiers(document);
+        assert.ok(privateIds.includes("exceptional-enum"), "except-out identifier should be excluded");
+        assert.ok(publicIds.includes("not-exceptional-enum"));
+        assert.ok(publicIds.includes("*not-special*"));
     });
 
 });
