@@ -103,6 +103,8 @@ export function definitionKind(defToken: string): FracasDefinitionKind {
             return FracasDefinitionKind.syntax;
         case 'define-type':
             return FracasDefinitionKind.type;
+        case 'struct':
+            return FracasDefinitionKind.type;
         case 'define-variant':
             return FracasDefinitionKind.variant;
         case 'define':

@@ -14,7 +14,7 @@ export const RX_COMMENT = ';;?\\s*(.*)\\s*$';
 export const RX_EXCEPT_OUT = '\\(except-out\\s+\\(\\s*all-defined-out\\s*\\)';
 export const RX_EXCEPT_OUT_EXPR = `${RX_EXCEPT_OUT}[\\s\\n]+([^\\)]+)\\)`;
 export const RX_IDENTIFIER = `(${RX_CHAR_IDENTIFIER}+)`
-export const RX_SYMBOLS_DEFINE = 'define-enum|define-game-data|define-key|define-text|define-string-table|define-mask|define-type-optional|define-syntax|define-syntax-rule|define-type|define-variant|define|define-list';
+export const RX_SYMBOLS_DEFINE = 'define-enum|define-game-data|define-key|define-text|define-string-table|define-mask|define-type-optional|define-syntax|define-syntax-rule|define-type|struct|define-variant|define|define-list';
 /**
  * A regex that matches an expression within the body of a "(provide ...", one of the forms:
  * (provide (all-defined-out))

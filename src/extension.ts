@@ -94,7 +94,7 @@ async function configurationChanged() {
     }
 }
 
-let diagnosticCollection: vscode.DiagnosticCollection;
+// let diagnosticCollection: vscode.DiagnosticCollection;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     // Each file has one output terminal and one repl
@@ -131,14 +131,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.workspace.onDidSaveTextDocument(async document => {
         if (document && document.languageId === "fracas") {
             // diagnosticCollection.clear();
-            const range = document.getWordRangeAtPosition(
-                vscode.window.activeTextEditor?.selection.anchor ?? new vscode.Position(0,0),
-                /[#:\w\-+*.>/]+/);
+            // const range = document.getWordRangeAtPosition(
+            //     vscode.window.activeTextEditor?.selection.anchor ?? new vscode.Position(0,0),
+            //     /[#:\w\-+*.>/]+/);
             
-            if (range) {
-                const diagnostic = new vscode.Diagnostic(range, "Why'd you fuck this up?", DiagnosticSeverity.Warning);
-                diagnosticCollection.set(document.uri, [diagnostic]);
-            }
+            // if (range) {
+            //     const diagnostic = new vscode.Diagnostic(range, "Why'd you fuck this up?", DiagnosticSeverity.Warning);
+            //     diagnosticCollection.set(document.uri, [diagnostic]);
+            // }
             
             await com.precompileFracasFile(document);
             _maybeUpdateStringTables([document.uri]);
@@ -171,8 +171,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         reg("ue4OpenAsset", () => ue4.ue4OpenEditorsForAssets()));
 
     // Register FRACAS language support
-    diagnosticCollection = vscode.languages.createDiagnosticCollection('fracas');
-    context.subscriptions.push(diagnosticCollection);
+    // diagnosticCollection = vscode.languages.createDiagnosticCollection('fracas');
+    // context.subscriptions.push(diagnosticCollection);
     context.subscriptions.push(
         vscode.languages.registerDefinitionProvider(fracasDocumentFilter, new FracasDefinitionProvider()));
     context.subscriptions.push(
