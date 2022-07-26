@@ -12,6 +12,27 @@ export function flatten<T>(array: T[][]): T[] {
     return array.reduce((a, b) => a.concat(b), []);
 }
 
+export function groupBy<T, K, V>(
+    array: T[], 
+    keyfn: (value: T, index: number, array: T[]) => K,
+    valuefn: (value: T, index: number, array: T[]) => V
+): Map<K, V[]> {
+    const grouped = array.reduce(
+        (map: Map<K, V[]>, arrayObj: T, index, ary) => {
+            const key = keyfn(arrayObj, index, ary);
+            const value = valuefn(arrayObj, index, ary)
+            if (!map.has(key)) {
+                map.set(key, []);
+            }
+            const values = map.get(key)!!;
+            values.push(value);   // add value
+            return map;
+        }, 
+        new Map<K, V[]>() // initial, empty map for reduce
+    );
+    return grouped;
+}
+
 export function getOrDefault<K, V>(map: Map<K, V>, key: K, getDefault: () => V): V {
     const value = map.get(key);
     if (value) {
