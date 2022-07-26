@@ -6,8 +6,12 @@ import {
 } from './config';
 import { lastMatch } from './regular-expressions';
 
-export async function findProjectFiles(pattern: string = '**/*.frc'): Promise<vscode.Uri[]> {
-    const files = vscode.workspace.findFiles(new vscode.RelativePattern(getProjectFolder(), pattern));
+export async function findProjectFiles(
+    pattern: string = '**/*.frc',
+    token?: vscode.CancellationToken
+): Promise<vscode.Uri[]> {
+    const searchPattern = new vscode.RelativePattern(getProjectFolder(), pattern);
+    const files = vscode.workspace.findFiles(searchPattern, undefined, undefined, token);
     return files;
 }
 

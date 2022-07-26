@@ -17,6 +17,7 @@ import { FracasReferenceProvider } from "./fracas/reference-provider";
 import { FracasDocumentSymbolProvider } from "./fracas/symbol-provider";
 import { FracasHoverProvider } from "./fracas/hover-provider";
 import { FracasDocumentFormattingEditProvider } from "./fracas/document-formatting-edit-provider";
+import { FracasSymbolCache } from "./fracas/symbol-cache";
 
 let langClient: LanguageClient;
 
@@ -95,6 +96,7 @@ async function configurationChanged() {
 }
 
 let diagnosticCollection: vscode.DiagnosticCollection;
+let symbolCache: FracasSymbolCache;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     // Each file has one output terminal and one repl
@@ -140,7 +142,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 diagnosticCollection.set(document.uri, [diagnostic]);
             }
             
-            await com.precompileFracasFile(document);
+            // disable pre-emptive fracas precompile for now. Fracas deps are a hairball and precompiling
+            // all dependencies can bring the whole machine to a halt.
+            // await com.precompileFracasFile(document);
             _maybeUpdateStringTables([document.uri]);
         }
     });
@@ -200,4 +204,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await configurationChanged(); // Start language server.
     watchProjectConfig(); // watch for wonderstorm .cfg file changes
     vscode.workspace.onDidChangeConfiguration(configurationChanged); // watch VS code config changes
+
+    symbolCache = new FracasSymbolCache(context.workspaceState);
+    await symbolCache.updateAll();
 }
