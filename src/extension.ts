@@ -140,7 +140,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             //     diagnosticCollection.set(document.uri, [diagnostic]);
             // }
             
-            await com.precompileFracasFile(document);
+            // await com.precompileFracasFile(document);
             _maybeUpdateStringTables([document.uri]);
         }
     });

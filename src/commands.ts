@@ -16,13 +16,16 @@ export function helpWithSelectedSymbol(): void {
     }
 }
 
-export function runInTerminal(terminals: Map<string, vscode.Terminal>): void {
-    utils.withRacketShellCmd((racketCmd: string) => {
+export async function runInTerminal(terminals: Map<string, vscode.Terminal>): Promise<void> {
+    utils.withRacketShellCmd(async (racketCmd: string) => {
         const document = vscode.window.activeTextEditor?.document;
         if (document) {
+            // precompile dependencies so that the file does not attempt to run out-of-date code.
+            await precompileFracasFile(document);
             document.save();
+            
+            // find a terminal and execute the file.
             const filePath = path.resolve(document.fileName);
-
             let terminal;
             if (
                 vscode.workspace
@@ -38,13 +41,15 @@ export function runInTerminal(terminals: Map<string, vscode.Terminal>): void {
     });
 }
 
-export function loadInRepl(repls: Map<string, vscode.Terminal>): void {
-    utils.withRacketShellCmd((racketCmd: string) => {
+export async function loadInRepl(repls: Map<string, vscode.Terminal>): Promise<void> {
+    utils.withRacketShellCmd(async (racketCmd: string) => {
         const document = vscode.window.activeTextEditor?.document;
         if (document) {
+            // precompile dependencies so that the file does not attempt to run out-of-date code.
+            await precompileFracasFile(document);
             document.save();
+            
             const filePath = path.resolve(document.fileName);
-
             const replTerminal = getOrDefault(repls, filePath, () => repl.createRepl(path.basename(filePath), racketCmd));
             repl.loadFileInRepl(filePath, replTerminal);
         }
