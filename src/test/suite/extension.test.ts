@@ -97,6 +97,23 @@ suite("Provide Tests", () => {
 suite("Find Definition Tests", () => {
     vscode.window.showInformationMessage("Start findDefinition tests.");
 
+    test("findDefinition ignores a forward declaration", async () => {
+        const { document } = await showFracasDocument(abilityActionDefinesFrc);
+        const defs: FracasDefinition[] = await findDefinition(document, new vscode.Position(114, 14)); // cursor within "((data damage-data)))"
+        assert.strictEqual(defs.length, 0, "findDefinition should ignore a forward declaration");
+    });
+
+    test("findDefinition resolves a define-key", async () => {
+        const { document } = await showFracasDocument(abilityDataDefinesFrc);
+        const defs: FracasDefinition[] = await findDefinition(document, new vscode.Position(398, 35)); // cursor within "*key-none*"
+        assert.strictEqual(defs.length, 1, "single definition not found");
+        assert.strictEqual(defs[0].kind, FracasDefinitionKind.key, "type definition kind is not 'key'");
+        assert.strictEqual(defs[0].completionKind, vscode.CompletionItemKind.Variable, "type completion kind is not 'Variable'");
+        assert.strictEqual(defs[0].symbol, "*key-none*", "symbol is not '*key-none*'");
+        assert.strictEqual(defs[0].location.uri.fsPath, abilityActionDefinesFrc);
+        assert.deepStrictEqual(defs[0].location.range, new vscode.Range(1, 12, 1, 22), "location of key is not correct");
+    });
+
     test("findDefinition resolves a named parameter", async () => {
         const { document } = await showFracasDocument(abilityFrc);
         const defs: FracasDefinition[] = await findDefinition(document, new vscode.Position(42, 38)); // cursor within "#:net-playback-mode"
