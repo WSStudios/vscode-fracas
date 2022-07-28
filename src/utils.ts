@@ -12,7 +12,8 @@ export interface ExecOptions {
 
 export function execShell(
     cmd: string,
-    options: ExecOptions = { showErrors: true, workingDir: getProjectDir(), timeoutMillis: 60_000 }
+    options: ExecOptions = { showErrors: true, workingDir: getProjectDir(), timeoutMillis: 60_000 },
+    token?: vscode.CancellationToken
 ) : Promise<string> {
     fracasOut.appendLine(`From working dir: '${options.workingDir}'`);
     fracasOut.appendLine(`Executing: '${cmd}'`);
@@ -34,6 +35,9 @@ export function execShell(
                 return resolve(out);
             });
 
+        // Kill the child process if the token is cancelled
+        token?.onCancellationRequested(() => child.kill());
+
         // if an input is given, pipe it to the child process
         if (options.input && child.stdin) {
             const stdinStream = new stream.Readable();
@@ -41,6 +45,23 @@ export function execShell(
             stdinStream.push(null);   // Signals the end of the stream (EOF)
             stdinStream.pipe(child.stdin);
         }
+    });
+}
+
+export function execShellWithProgress(
+    cmd: string,
+    title: string,
+    options: ExecOptions = { showErrors: true, workingDir: getProjectDir(), timeoutMillis: 60_000 }
+) : Thenable<string> {
+    return vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        cancellable: true,
+        title: title
+    }, async (progress, token) => {
+        progress.report({  increment: 25 });
+        const output = await execShell(cmd, options, token);
+        progress.report({ increment: 100 });
+        return output;
     });
 }
 
