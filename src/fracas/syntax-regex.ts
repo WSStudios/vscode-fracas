@@ -44,8 +44,8 @@ export function anyDefineRx(): string {
 
 export function anyDefineSymbolRx(symbol: string, searchKind = SearchKind.wholeMatch): string {
     return searchKind === SearchKind.wholeMatch ?
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${escapeForRegEx(symbol)})(?!${RX_CHAR_IDENTIFIER}|${RX_CHARS_CLOSE_PAREN})` :
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)(?!${RX_CHARS_CLOSE_PAREN})`;
+        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${escapeForRegEx(symbol)})(?!${RX_CHAR_IDENTIFIER})` :
+        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*))`;
 }
 
 export function definePartialSymbolRx(symbol: string): string {

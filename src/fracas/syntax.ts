@@ -40,6 +40,7 @@ import {
     RX_EXCEPT_OUT,
     RX_IDENTIFIER,
     RX_PROVIDED_EXPRESSION,
+    // RX_FORWARD_DECL,
     SearchKind,
     variantOptionRx,
 } from './syntax-regex';
@@ -76,7 +77,8 @@ export class FracasDefinition {
         readonly location: vscode.Location, 
         readonly symbol: string, 
         readonly kind: FracasDefinitionKind,
-        readonly completionKind: vscode.CompletionItemKind = completionItemKind(kind))
+        readonly completionKind: vscode.CompletionItemKind = completionItemKind(kind),
+        readonly isForwardDeclaration: boolean = false)
     {
     }
 }
@@ -196,6 +198,18 @@ export function symbolKind(fracasKind: FracasDefinitionKind): vscode.SymbolKind 
     }
 }
 
+export function canForwardDeclare(fracasKind: FracasDefinitionKind): boolean {
+    switch (fracasKind) {
+        case (FracasDefinitionKind.enum):
+        case (FracasDefinitionKind.mask):
+        case (FracasDefinitionKind.typeOptional):
+        case (FracasDefinitionKind.type):
+        case (FracasDefinitionKind.variant):
+            return true;
+        default:
+            return false;
+    }
+}
 
 /**
  * Get the nesting depth at which members are declared for a fracas type definition (e.g., enum, variant, type, etc.).
@@ -545,31 +559,37 @@ export async function findMaskDefinition(
     token?: vscode.CancellationToken,
     searchKind = SearchKind.wholeMatch
 ): Promise<FracasDefinition[]> {
-    const defineRxStr = anyMaskSymbolRx(typeName, searchKind);
+    const defineRxStr = anyMaskSymbolRx(typeName, searchKind); 
     return _findDefinition(defineRxStr, token);
 }
 
+const RX_FORWARD_DECL = /(?<=[\(|\{|\[])\s*(define-enum|define-mask|define-type-optional|define-type|define-variant)\s+([\w\-\*\.]+)\s*(\)|\}|\])/
 async function _findDefinition(
     defineRxStr: string,
     token?: vscode.CancellationToken
-): Promise<FracasDefinition[]> {
+    ): Promise<FracasDefinition[]> {
     // search for an explicit define-xxx matching the token, e.g., given "module-db" find "(define-type module-db"
     const textMatches = await findTextInFiles(defineRxStr, token);
     fracasOut.appendLine(`Found ${textMatches.length} matches for ${defineRxStr}`);
+    const defineRx = new RegExp(defineRxStr);
     const defs = await mapAsync(textMatches, async textMatch => {
         // extract the symbol name substring, e.g. get "range-int" from "(define-type range-int"
-        const rxMatch = new RegExp(defineRxStr).exec(textMatch.preview.text);
+        const rxMatch = defineRx.exec(textMatch.preview.text);
         if (rxMatch) {
             const [_, defToken, symbol] = rxMatch;
             const location = await regexGroupUriLocation(rxMatch, 2, textMatch.uri, getRange(textMatch.ranges).start);
-            return new FracasDefinition(location, symbol, definitionKind(defToken));
+            const fracasKind = definitionKind(defToken);
+            const isForwardDeclaration = canForwardDeclare(fracasKind) && RX_FORWARD_DECL.test(textMatch.preview.text);
+
+            return new FracasDefinition(location, symbol, fracasKind, completionItemKind(fracasKind), isForwardDeclaration);
         } else {
             vscode.window.showErrorMessage(`Failed to extract symbol name from ${textMatch.preview.text} using regex '${defineRxStr}'. An engineer should check that the regex is correct.`);
             const location = new vscode.Location(textMatch.uri, getRange(textMatch.ranges));
             return new FracasDefinition(location, textMatch.preview.text, definitionKind("define"));
         }
-    });
-    return defs;
+    })
+    
+    return defs.filter(def => !def.isForwardDeclaration);
 }
 
 export async function findVariantOptionDefinition(
