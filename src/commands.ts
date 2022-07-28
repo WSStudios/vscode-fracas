@@ -155,14 +155,15 @@ export async function precompileFracasFile(frcDoc: vscode.TextDocument | undefin
             const coresUsed = Math.ceil(os.cpus().length / 2); // use half the cores available to prevent starvation
             const ninjaCmd = `"${ninja}" -j ${coresUsed} -f "${precompileNinjaFile}"`;
             config.fracasOut.appendLine(`Precompiling fracas files with ${coresUsed} cores because ${frcDoc.fileName} has changed: ${ninjaCmd}`);
-    
+
             const execOpts = {
                 workingDir: projectFolder.uri.fsPath,
                 showErrors: false,
-                timeoutMillis: 240_000
+                timeoutMillis: 240_000,
+                lowPriority: true,
+                serializedExecutionKey: "precompileFracasFile"
             };
             await utils.execShellWithProgress(ninjaCmd, "Compiling Fracas", execOpts);
-
         } finally {
             // re-enable fracas commands
             vscode.commands.executeCommand('setContext', 'vscode-fracas.ready', true);
