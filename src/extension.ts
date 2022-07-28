@@ -103,7 +103,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const terminals: Map<string, vscode.Terminal> = new Map();
     const repls: Map<string, vscode.Terminal> = new Map();
 
-    // precompile fracas every time a file is saved
     function _maybeUpdateStringTables(uris: readonly vscode.Uri[]): void {
         if (uris.some(uri => {
             const fileName = path.basename(uri.path);
@@ -112,7 +111,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             com.makeStringTableImport();
         }
     }
-
     // vscode.workspace.onDidChangeTextDocument(changeEvent => {
     //     const document = changeEvent.document;
     //     if (document.languageId === 'fracas') {
@@ -127,7 +125,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     //     }
     // });
     
-    vscode.workspace.fs.stat
+    // Update string tables and precompile fracas every time a file is saved
     vscode.workspace.onDidSaveTextDocument(async document => {
         if (document && document.languageId === "fracas") {
             // diagnosticCollection.clear();
@@ -140,7 +138,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             //     diagnosticCollection.set(document.uri, [diagnostic]);
             // }
             
-            // await com.precompileFracasFile(document);
+            await com.precompileFracasFile(document);
             _maybeUpdateStringTables([document.uri]);
         }
     });
@@ -200,4 +198,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await configurationChanged(); // Start language server.
     watchProjectConfig(); // watch for wonderstorm .cfg file changes
     vscode.workspace.onDidChangeConfiguration(configurationChanged); // watch VS code config changes
+
+    vscode.commands.executeCommand('setContext', 'vscode-fracas.ready', true);
 }
