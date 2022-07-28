@@ -52,17 +52,6 @@ export function execShell(
                 }
                 
                 resolve(stdout);
-            }).on("exit", (code, signal) => {
-                const message = `Command exited with code ${code} signal ${signal}: '${cmd}'`;
-                fracasOut.appendLine(message);
-                
-                if (options.serializedExecutionKey) {
-                    runningProcesses.delete(options.serializedExecutionKey);
-                }
-
-                if (code !== 0) {
-                    reject(message);
-                }
             });
 
         // keep track of this execution
