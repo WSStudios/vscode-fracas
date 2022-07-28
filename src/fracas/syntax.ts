@@ -21,6 +21,7 @@ import {
     anyConstructorRx,
     anyDefineRx,
     anyDefineSymbolRx,
+    anyKeySymbolRx,
     anyEnumSymbolRx,
     anyFieldDeclarationRx,
     anyFieldSymbolDeclarationRx,
@@ -531,6 +532,14 @@ export async function findSymbolDefinition(
     return _findDefinition(defineRxStr, token);
 }
 
+export async function findKeyDefinition(
+    typeName: string,
+    token?: vscode.CancellationToken
+): Promise<FracasDefinition[]> {
+    const defineRxStr = anyKeySymbolRx(typeName);
+    return _findDefinition(defineRxStr, token);
+}
+
 export async function findEnumDefinition(
     typeName: string,
     token?: vscode.CancellationToken,
@@ -874,7 +883,7 @@ export async function findDefinition(
         return keywords;
     }
 
-    // git the symbol at the cursor
+    // get the symbol at the cursor
     const symbol = getSelectedSymbol(document, position, true);
 
     // if the cursor is within an (import ... ) statement, find the source document
@@ -893,6 +902,12 @@ export async function findDefinition(
     const symbolDefs = await findSymbolDefinition(symbol, token, searchKind);
     if (symbolDefs.length > 0) {
         return symbolDefs;
+    }
+
+    // search for define-key matching the token, e.g., given "my-key" find "(define-key my-key)"
+    const keyDefs = await findKeyDefinition(symbol, token);
+    if (keyDefs.length > 0) {
+        return keyDefs;
     }
 
     // search for a variant option matching the symbol

@@ -48,6 +48,10 @@ export function anyDefineSymbolRx(symbol: string, searchKind = SearchKind.wholeM
         `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)(?!${RX_CHARS_CLOSE_PAREN})`;
 }
 
+export function anyKeySymbolRx(symbol: string): string {
+    return `([${RX_CHARS_OPEN_PAREN}])\\s*(define-key)\\s+${escapeForRegEx(symbol)}(${RX_CHARS_CLOSE_PAREN})`;
+}
+
 export function definePartialSymbolRx(symbol: string): string {
     return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${RX_CHAR_IDENTIFIER}*${escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)(?!${RX_CHARS_CLOSE_PAREN})`;
 }
