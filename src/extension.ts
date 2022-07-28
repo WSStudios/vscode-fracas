@@ -7,6 +7,7 @@ import {
     fracasOut,
     loadProjectConfig,
     setFormatterScript,
+    shouldPrecompileOnSave,
     watchProjectConfig
 } from "./config";
 import { withRacket } from "./utils";
@@ -138,7 +139,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             //     diagnosticCollection.set(document.uri, [diagnostic]);
             // }
             
-            await com.precompileFracasFile(document);
+            if (shouldPrecompileOnSave()) {
+                await com.precompileFracasFile(document);
+            }
             _maybeUpdateStringTables([document.uri]);
         }
     });

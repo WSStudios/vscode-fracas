@@ -144,11 +144,17 @@
                     "markdownDescription": "Paths to search for Racket collections. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
                     "order": 1
                 },
+                "vscode-fracas.general.precompileOnSave": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Automatically compile fracas whenever a file is saved. Pre-compilation uses CPU, but makes the `Run file in terminal` command start more quickly.",
+                    "order": 2
+                },
                 "vscode-fracas.formatting.indentComments": {
                     "type": "boolean",
                     "default": true,
                     "markdownDescription": "If true, comment lines will be indented possibly messing with any deliberate comment layout",
-                    "order": 2
+                    "order": 3
                 },
                 "vscode-fracas.localization.stringTableRegistryFile": {
                     "type": "string",
