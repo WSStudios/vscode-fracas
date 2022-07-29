@@ -1,3 +1,5 @@
+import * as kill from "tree-kill";
+import * as os from "os"
 import * as vscode from "vscode";
 import * as cp from "child_process";
 import { fracasOut, getProjectDir, getRacket, getRacketShellCmd } from "./config";
@@ -8,31 +10,66 @@ export interface ExecOptions {
     workingDir?: string;
     showErrors: boolean;
     timeoutMillis: number;
+    lowPriority?: boolean;
+    serializedExecutionKey?: string; // unique id for the command. If a previous instance is still running, cancel it before executing the new one.
 }
 
+const runningProcesses: Map<string, cp.ChildProcess> = new Map();
 export function execShell(
     cmd: string,
-    options: ExecOptions = { showErrors: true, workingDir: getProjectDir(), timeoutMillis: 60_000 }
+    options: ExecOptions = { showErrors: true, workingDir: getProjectDir(), timeoutMillis: 60_000 },
+    token?: vscode.CancellationToken
 ) : Promise<string> {
     fracasOut.appendLine(`From working dir: '${options.workingDir}'`);
     fracasOut.appendLine(`Executing: '${cmd}'`);
+
+    // kill previous process if it is still running
+    if (options.serializedExecutionKey) {
+        const previousProcess = runningProcesses.get(options.serializedExecutionKey);
+        if (previousProcess) {
+            if (previousProcess.exitCode === null) {
+                kill(previousProcess.pid);
+            }
+        }
+    }
+    
+    // launch the process
     return new Promise<string>((resolve, reject) => {
         const child = cp.exec(cmd,
             { cwd: options.workingDir, timeout: options.timeoutMillis },
-            (err, out) => {
-                if (err) {
+            (error, stdout) => {
+                if (error) {
                     if (options.showErrors) {
-                        vscode.window.showErrorMessage(err.message + "\n" + out);
+                        vscode.window.showErrorMessage(error.message + "\n" + stdout);
                     }
                     fracasOut.appendLine(`Command failed '${cmd}':`);
-                    fracasOut.appendLine(`${err.name}: ${err.message}`);
-                    if (err.stack) {
-                        fracasOut.appendLine(err.stack);
+                    fracasOut.appendLine(`${error.name}: ${error.message}`);
+                    if (error.stack) {
+                        fracasOut.appendLine(error.stack);
                     }
-                    return reject(err);
+                    
+                    reject(error);
                 }
-                return resolve(out);
+                
+                resolve(stdout);
             });
+
+        // keep track of this execution
+        if (options.serializedExecutionKey) {
+            runningProcesses.set(options.serializedExecutionKey, child);
+        }
+        
+        // Kill the child process if the token is cancelled
+        token?.onCancellationRequested(() => { 
+            if (child.exitCode === null) { 
+                kill(child.pid); 
+            } 
+        });
+        
+        // nice the process if it's low priority
+        if (options.lowPriority) {
+            os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL);
+        }
 
         // if an input is given, pipe it to the child process
         if (options.input && child.stdin) {
@@ -42,6 +79,23 @@ export function execShell(
             stdinStream.pipe(child.stdin);
         }
     });
+}
+
+export function execShellWithProgress(
+    cmd: string,
+    title: string,
+    options: ExecOptions = { showErrors: true, workingDir: getProjectDir(), timeoutMillis: 60_000 }
+) : Thenable<string> {
+    return vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        cancellable: true,
+        title: title
+    }, async (progress, token) => {
+        progress.report({  message: "Working..." });
+        const output = await execShell(cmd, options, token);
+        progress.report({ message: "Done!" });
+        return output;
+    }).then(undefined, (error) => error );
 }
 
 export function kebabCaseToPascalCase(input: string): string

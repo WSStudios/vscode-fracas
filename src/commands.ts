@@ -1,3 +1,4 @@
+import * as os from "os";
 import * as path from "path";
 import * as tmpPromise from "tmp-promise";
 import { TextEncoder } from "util";
@@ -95,7 +96,9 @@ export async function makeStringTableImport(): Promise<void> {
         });
 
         config.fracasOut.appendLine(`Generating ${textFrcFiles.length} text source files into "${stringTableCpp}"`);
-        await utils.execShell(`${racket} ../fracas/lib/fracas/make-string-table-import.rkt -- ${csvFiles.join(" ")}`);
+
+        const cmd = `${racket} ../fracas/lib/fracas/make-string-table-import.rkt -- ${csvFiles.join(" ")}`;
+        await utils.execShellWithProgress(cmd, `Generating ${path.basename(stringTableCpp)}`);
     }
 }
 
@@ -103,8 +106,9 @@ export async function compileFracasObject(filePath: string, fracasObject: string
     const racket = config.getRacketShellCmd();
     if (fracasObject && filePath && racket) {
         vscode.window.activeTextEditor?.document?.save();
-        const cmd = `(require fracas/make-asset) (enter! (file "${filePath}")) (define-asset-impl: #:value ${fracasObject} #:value-name (quote ${fracasObject}) #:key (key: ${fracasObject}))`;
-        await utils.execShell(`${racket} -e "${cmd.replace(/"/g, '\\"')}"`);
+        const racketExpr = `(require fracas/make-asset) (enter! (file "${filePath}")) (define-asset-impl: #:value ${fracasObject} #:value-name (quote ${fracasObject}) #:key (key: ${fracasObject}))`;
+        const cmd = `${racket} -e "${racketExpr.replace(/"/g, '\\"')}"`
+        await utils.execShellWithProgress(cmd, `Compiling ${fracasObject}`);
     }
 }
 
@@ -128,30 +132,42 @@ export async function precompileFracasFile(frcDoc: vscode.TextDocument | undefin
 
     // if there is a fracas document, precompile it
     if (frcDoc && frcDoc.languageId === "fracas") {
-        frcDoc.save(); // save the document before precompiling
-
-        const ninja = config.getNinja();
-
-        // Invoke ninja to update all precompiled zo file dependencies
-        const precompileNinjaFile = path.join("build", "build_precompile.ninja");
-        const projectFolder = config.getProjectFolder();
-
         try {
-            // make sure build_precompile.ninja exists. Users with pre-built binaries may not have this file
-            await vscode.workspace.fs.stat(vscode.Uri.joinPath(projectFolder.uri, precompileNinjaFile));
-        } catch {
-            config.fracasOut.appendLine("Skip precompiling because build_precompile.ninja does not exist");
-            return;
-        }
+            // disable fracas commands until precompilation is done
+            vscode.commands.executeCommand('setContext', 'vscode-fracas.ready', false);
 
-        const ninjaCmd = `"${ninja}" -f "${precompileNinjaFile}"`;
-        config.fracasOut.appendLine(`Precompiling fracas files because ${frcDoc.fileName} has changed: ${ninjaCmd}`);
-        const execOpts = {
-            workingDir: projectFolder.uri.fsPath,
-            showErrors: false,
-            timeoutMillis: 240_000
-        };
-        await utils.execShell(ninjaCmd, execOpts);
+            frcDoc.save(); // save the document before precompiling
+    
+            const ninja = config.getNinja();
+    
+            // Invoke ninja to update all precompiled zo file dependencies
+            const precompileNinjaFile = path.join("build", "build_precompile.ninja");
+            const projectFolder = config.getProjectFolder();
+    
+            try {
+                // make sure build_precompile.ninja exists. Users with pre-built binaries may not have this file
+                await vscode.workspace.fs.stat(vscode.Uri.joinPath(projectFolder.uri, precompileNinjaFile));
+            } catch {
+                config.fracasOut.appendLine("Skip precompiling because build_precompile.ninja does not exist");
+                return;
+            }
+    
+            const coresUsed = Math.ceil(os.cpus().length / 2); // use half the cores available to prevent starvation
+            const ninjaCmd = `"${ninja}" -j ${coresUsed} -f "${precompileNinjaFile}"`;
+            config.fracasOut.appendLine(`Precompiling fracas files with ${coresUsed} cores because ${frcDoc.fileName} has changed: ${ninjaCmd}`);
+
+            const execOpts = {
+                workingDir: projectFolder.uri.fsPath,
+                showErrors: false,
+                timeoutMillis: 240_000,
+                lowPriority: true,
+                serializedExecutionKey: "precompileFracasFile"
+            };
+            await utils.execShellWithProgress(ninjaCmd, "Compiling Fracas", execOpts);
+        } finally {
+            // re-enable fracas commands
+            vscode.commands.executeCommand('setContext', 'vscode-fracas.ready', true);
+        }
     }
 }
 

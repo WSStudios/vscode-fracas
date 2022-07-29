@@ -144,11 +144,17 @@
                     "markdownDescription": "Paths to search for Racket collections. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
                     "order": 1
                 },
+                "vscode-fracas.general.precompileOnSave": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Automatically compile fracas whenever a file is saved. Pre-compilation uses CPU, but makes the `Run file in terminal` command start more quickly.",
+                    "order": 2
+                },
                 "vscode-fracas.formatting.indentComments": {
                     "type": "boolean",
                     "default": true,
                     "markdownDescription": "If true, comment lines will be indented possibly messing with any deliberate comment layout",
-                    "order": 2
+                    "order": 3
                 },
                 "vscode-fracas.localization.stringTableRegistryFile": {
                     "type": "string",
@@ -231,6 +237,7 @@
             {
                 "command": "vscode-fracas.runFile",
                 "title": "Racket: Run file in terminal",
+                "enablement": "vscode-fracas.ready",
                 "icon": {
                     "light": "images/run.svg",
                     "dark": "images/run.svg"
@@ -238,11 +245,13 @@
             },
             {
                 "command": "vscode-fracas.executeSelectionInRepl",
-                "title": "Racket: Execute selection in REPL"
+                "title": "Racket: Execute selection in REPL",
+                "enablement": "vscode-fracas.ready"
             },
             {
                 "command": "vscode-fracas.openRepl",
-                "title": "Racket: Open the REPL for the current file"
+                "title": "Racket: Open the REPL for the current file",
+                "enablement": "vscode-fracas.ready"
             },
             {
                 "command": "vscode-fracas.showOutputTerminal",
@@ -250,19 +259,23 @@
             },
             {
                 "command": "vscode-fracas.compileSelectedFracasObject",
-                "title": "Fracas: Compile Selected Object"
+                "title": "Fracas: Compile Selected Object",
+                "enablement": "vscode-fracas.ready"
             },
             {
                 "command": "vscode-fracas.recompileFracasObject",
-                "title": "Fracas: Recompile Previous Object"
+                "title": "Fracas: Recompile Previous Object",
+                "enablement": "vscode-fracas.ready"
             },
             {
                 "command": "vscode-fracas.makeStringTableImport",
-                "title": "Fracas: Make String Table CPP"
+                "title": "Fracas: Make String Table CPP",
+                "enablement": "vscode-fracas.ready"
             },
             {
                 "command": "vscode-fracas.precompileFracasFile",
-                "title": "Fracas: Precompile File"
+                "title": "Fracas: Precompile File",
+                "enablement": "vscode-fracas.ready"
             },
             {
                 "command": "vscode-fracas.ue4OpenAsset",
@@ -384,6 +397,7 @@
         "ini": "^2.0.0",
         "tmp": "^0.2.1",
         "tmp-promise": "^3.0.3",
+        "tree-kill": "1.2.2",
         "vscode-languageclient": "^7.0.0"
     }
 }

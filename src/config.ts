@@ -148,3 +148,9 @@ export function shouldFormatterIndentComments(): boolean {
         .getConfiguration("vscode-fracas.formatting")
         .get<boolean>("indentComments") ?? true;
 }
+
+export function shouldPrecompileOnSave(): boolean {
+    return vscode.workspace
+        .getConfiguration("vscode-fracas.general")
+        .get<boolean>("precompileOnSave") ?? true;
+}

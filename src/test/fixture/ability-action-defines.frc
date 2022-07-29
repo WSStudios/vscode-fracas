@@ -1,5 +1,5 @@
 #lang fracas
-
+(define-key *key-none*)
 ;; Actions are always performed in the order they appear in the arrays below
 (define-variant action-block
   #:u-data-asset
@@ -95,4 +95,22 @@
     )
    )
   )
-  
+
+  (define-type damage-data) # forward decl
+
+(define-variant action
+  #:export-constructor
+  ;; If run from an ability where `ability-data.commit` is set to `(enum ability-commit-mode on-ability-action)`,
+  ;; this action can be used to delay deducting costs or starting the cooldown until a specific state or point in the animation (e.g., by use in #:anim-actions).
+  ;; This is useful for resources from consumables, since you don't want to punish the player and spend their resources unless they get the benefit from the ability.
+  ;; E.g., if the player gets hit-reacted/interrupted while using a jelly tart before the heal effect is applied, it wouldn't use your consumable
+  ;; if the `action-commit` was on the same animation frame as the heal effect.
+  ;; Targets are ignored for this action, and it is applied only to the actor executing the action
+  ;; (otherwise, you could have players targeting one another and committing each other's abilites).
+  (commit-ability
+   ((mode commit #:default (mask commit cost cooldown)))) ;; default is to commit cost and cooldown together
+
+  ;; applies a gameplay effect that damages all targets
+  (damage
+   ((data damage-data)))
+)
