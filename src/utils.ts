@@ -1,4 +1,4 @@
-import * as kill from "tree-kill";
+import treeKill = require("tree-kill");
 import * as os from "os"
 import * as vscode from "vscode";
 import * as cp from "child_process";
@@ -28,7 +28,7 @@ export function execShell(
         const previousProcess = runningProcesses.get(options.serializedExecutionKey);
         if (previousProcess) {
             if (previousProcess.exitCode === null) {
-                kill(previousProcess.pid);
+                treeKill(previousProcess.pid);
             }
         }
     }
@@ -62,7 +62,7 @@ export function execShell(
         // Kill the child process if the token is cancelled
         token?.onCancellationRequested(() => { 
             if (child.exitCode === null) { 
-                kill(child.pid); 
+                treeKill(child.pid); 
             } 
         });
         
