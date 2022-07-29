@@ -91,9 +91,9 @@ export function execShellWithProgress(
         cancellable: true,
         title: title
     }, async (progress, token) => {
-        progress.report({  message: "doin it now" });
+        progress.report({  message: "Working..." });
         const output = await execShell(cmd, options, token);
-        progress.report({ message: "all done yo" });
+        progress.report({ message: "Done!" });
         return output;
     }).then(undefined, (error) => error );
 }
