@@ -14,6 +14,7 @@ import {
     FracasDefinition,
     FracasDefinitionKind
 } from "../../fracas/syntax";
+import { SearchKind } from "../../fracas/syntax-regex";
 // import * as myExtension from '../../extension';
 
 async function showFracasDocument(
@@ -96,6 +97,18 @@ suite("Provide Tests", () => {
 
 suite("Find Definition Tests", () => {
     vscode.window.showInformationMessage("Start findDefinition tests.");
+
+    test("findDefinition resolves a partial match", async () => {
+        const { document } = await showFracasDocument(abilityActionDefinesFrc);
+        // cursor within "action-block" of "(define-variant action-block"        
+        const defs: FracasDefinition[] = await findDefinition(document, new vscode.Position(3, 25), undefined, SearchKind.partialMatch);
+        assert.strictEqual(defs.length, 1, "findDefinition should resolve partial matches");
+        assert.strictEqual(defs[0].kind, FracasDefinitionKind.variant, "type definition kind is not 'key'");
+        assert.strictEqual(defs[0].completionKind, vscode.CompletionItemKind.Struct, "type completion kind is not 'Variable'");
+        assert.strictEqual(defs[0].symbol, "action-block", "symbol is not 'action-block'");
+        assert.strictEqual(defs[0].location.uri.fsPath, abilityActionDefinesFrc);
+        assert.deepStrictEqual(defs[0].location.range, new vscode.Range(3, 16, 3, 28), "location of action-block is not correct");
+    });
 
     test("findDefinition ignores a forward declaration", async () => {
         const { document } = await showFracasDocument(abilityActionDefinesFrc);
