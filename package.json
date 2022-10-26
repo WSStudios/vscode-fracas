@@ -25,6 +25,7 @@
         "onCommand:vscode-fracas.executeSelectionInRepl",
         "onCommand:vscode-fracas.loadFileInRepl",
         "onCommand:vscode-fracas.makeStringTableImport",
+        "onCommand:vscode-fracas.updateProjectFileJsonCategory",
         "onCommand:vscode-fracas.openRepl",
         "onCommand:vscode-fracas.precompileFracasFile",
         "onCommand:vscode-fracas.recompileFracasObject",
@@ -144,17 +145,23 @@
                     "markdownDescription": "Paths to search for Racket collections. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
                     "order": 1
                 },
+                "vscode-fracas.general.projectFile": {
+                    "type": "string",
+                    "default": "project.rktd",
+                    "markdownDescription": "Path to the project file that lists all `.frc` sources used to generate JSON. Relative to `#vscode-fracas.general.projectWorkspaceFolder#`",
+                    "order": 2
+                },
                 "vscode-fracas.general.precompileOnSave": {
                     "type": "boolean",
                     "default": true,
                     "markdownDescription": "Automatically compile fracas whenever a file is saved. Pre-compilation uses CPU, but makes the `Run file in terminal` command start more quickly.",
-                    "order": 2
+                    "order": 3
                 },
                 "vscode-fracas.formatting.indentComments": {
                     "type": "boolean",
                     "default": true,
                     "markdownDescription": "If true, comment lines will be indented possibly messing with any deliberate comment layout",
-                    "order": 3
+                    "order": 4
                 },
                 "vscode-fracas.localization.stringTableRegistryFile": {
                     "type": "string",
@@ -270,6 +277,11 @@
             {
                 "command": "vscode-fracas.makeStringTableImport",
                 "title": "Fracas: Make String Table CPP",
+                "enablement": "vscode-fracas.ready"
+            },
+            {
+                "command": "vscode-fracas.updateProjectFileJsonCategory",
+                "title": "Fracas: Update Project File List",
                 "enablement": "vscode-fracas.ready"
             },
             {

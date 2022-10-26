@@ -206,24 +206,31 @@ function _computeTextLineStarts(text: string, newline: string): Uint32Array {
 
 /**
  * Find the first occurrence of a regex match within a document starting at the given position.
- * @param uri The document to search
- * @param pos The position at which to begin searching
+ * @param document The document to search
  * @param searchRx The regular expression to search for
+ * @param startPos The position at which to begin searching, or undefined to search from the beginning of the document.
+ * @param endPos The line at which to stop searching, or undefined to search to the end of the document.
  * @returns The position of the first match, or undefined if no match was found.
  */
-export async function searchForward(uri: vscode.Uri, pos: vscode.Position, searchRx: RegExp
+export async function searchForward(
+    document: vscode.TextDocument,
+    searchRx: RegExp,
+    startLine?: number,
+    endLine?: number
 ): Promise<{ line: vscode.TextLine, match: RegExpExecArray } | undefined> {
-    const doc = await vscode.workspace.openTextDocument(uri);
-    let lineNo = pos.line;
-    let line = doc.lineAt(lineNo);
-    let lineText = line.text.substring(pos.character);
-    while (lineNo < doc.lineCount) {
+    if (endLine == undefined) {
+        endLine = document.lineCount - 1;
+    }
+    let lineNo = startLine ?? 0;
+    let line = document.lineAt(lineNo);
+    let lineText = line.text;
+    while (lineNo <= endLine) {
         const match = searchRx.exec(lineText);
         if (match) {
             return { line, match };
         }
 
-        line = doc.lineAt(lineNo);
+        line = document.lineAt(lineNo);
         lineText = line.text;
         lineNo += 1;
     }

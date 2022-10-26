@@ -139,10 +139,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             //     diagnosticCollection.set(document.uri, [diagnostic]);
             // }
             
+            const promises = []
             if (shouldPrecompileOnSave()) {
-                await com.precompileFracasFile(document);
+                promises.push(com.precompileFracasFile(document));
             }
+            promises.push(com.updateProjectFileJsonCategory());
             _maybeUpdateStringTables([document.uri]);
+            await Promise.all(promises);
         }
     });
     vscode.workspace.onDidDeleteFiles(e => _maybeUpdateStringTables(e.files));
@@ -163,6 +166,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         reg("recompileFracasObject", () => com.recompileFracasObject()),
         reg("precompileFracasFile", () => com.precompileFracasFile()),
         reg("makeStringTableImport", () => com.makeStringTableImport()),
+        reg("updateProjectFileJsonCategory", () => com.updateProjectFileJsonCategory()),
         reg("loadFileInRepl", () => com.loadInRepl(repls)),
         reg("runFile", () => com.runInTerminal(terminals)),
         reg("executeSelectionInRepl", () => com.executeSelection(repls)),
