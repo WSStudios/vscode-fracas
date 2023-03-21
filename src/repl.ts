@@ -49,7 +49,7 @@ export function runFileInTerminal(
 
 export function loadFileInRepl(filePath: string, repl: vscode.Terminal): void {
     repl.show();
-    repl.sendText(`(enter! (file "${filePath}"))`);
+    repl.sendText(`(enter! (file "${filePath.replaceAll('\\','/')}"))`);
 }
 
 export function createTerminal(filePath: string | null): vscode.Terminal {
