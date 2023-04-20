@@ -104,14 +104,39 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const terminals: Map<string, vscode.Terminal> = new Map();
     const repls: Map<string, vscode.Terminal> = new Map();
 
-    function _maybeUpdateStringTables(uris: readonly vscode.Uri[]): void {
+    async function _maybeUpdateStringTables(uris: readonly vscode.Uri[]): Promise<void> {
         if (uris.some(uri => {
             const fileName = path.basename(uri.path);
             return fileName.startsWith("localized-text") && fileName.endsWith(".frc");
         })) {
-            com.makeStringTableImport();
+            await com.makeStringTableImport();
         }
     }
+
+    /**
+     * Update project.rktd and TdpLocalization.cpp/h when downstream fracas file dependencies change.
+     * @param uris URIs for files modified, renamed, or deleted
+     * @returns A promise that resolves after updating project.rktd and TdpLocalization.cpp/h
+     */
+    function _updateProjectFiles(uris: readonly vscode.Uri[], skipPrecompile: boolean = false): Promise<void>[] {
+        const promises = [
+            _maybeUpdateStringTables(uris), 
+            com.updateProjectFileJsonCategory()
+        ]
+        if (!skipPrecompile && shouldPrecompileOnSave()) {
+            promises.push(...uris.map(async uri => {
+                try {
+                    await vscode.workspace.fs.stat(uri); // check if file exists. VS Code this is an awful API.
+                    const document = await vscode.workspace.openTextDocument(uri);
+                    com.precompileFracasFile(document)
+                } catch {
+                    fracasOut.appendLine(`I won't precompile ${uri.fsPath} because it doesn't exist.`)
+                }
+            }));
+        }
+        return promises
+    }
+    
     // vscode.workspace.onDidChangeTextDocument(changeEvent => {
     //     const document = changeEvent.document;
     //     if (document.languageId === 'fracas') {
@@ -139,19 +164,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             //     diagnosticCollection.set(document.uri, [diagnostic]);
             // }
             
-            const promises = []
-            if (shouldPrecompileOnSave()) {
-                promises.push(com.precompileFracasFile(document));
-            }
-            promises.push(com.updateProjectFileJsonCategory());
-            _maybeUpdateStringTables([document.uri]);
-            await Promise.all(promises);
+            await Promise.all(_updateProjectFiles([document.uri]));
         }
     });
-    vscode.workspace.onDidDeleteFiles(e => _maybeUpdateStringTables(e.files));
-    vscode.workspace.onDidCreateFiles(e => _maybeUpdateStringTables(e.files));
-    vscode.workspace.onDidRenameFiles(e => _maybeUpdateStringTables(
-        e.files.map(f => f.newUri).concat(e.files.map(f => f.oldUri))));
+    vscode.workspace.onDidDeleteFiles(async e => 
+        await Promise.all(_updateProjectFiles(e.files, true)));
+    vscode.workspace.onDidCreateFiles(async e =>
+        await Promise.all(_updateProjectFiles(e.files)));
+    vscode.workspace.onDidRenameFiles(async e =>
+        await Promise.all(_updateProjectFiles(e.files.map(f => f.newUri).concat(e.files.map(f => f.oldUri)))));
 
     vscode.window.onDidCloseTerminal((terminal) => {
         terminals.forEach((val, key) => val === terminal && terminals.delete(key) && val.dispose());
