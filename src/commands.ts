@@ -129,7 +129,7 @@ export async function updateProjectFileJsonCategory(token?: vscode.CancellationT
     }
 
     // Find all unique fracas files containing a (define-game-data ...) expression
-    const gameDataDefines = await editorLib.findTextInFiles("^\\s*\\(define-game-data\\s", token);
+    const gameDataDefines = await editorLib.findTextInFiles("^\\s*\\(define-game-data\\b", token);
     const nonJsonDirs = [
         "fracas/platform/",
         "fracas/platform-login-data.frc",
