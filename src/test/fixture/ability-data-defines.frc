@@ -423,3 +423,5 @@
    (shared-movement-modifiers shared-movement-modifiers #:default (shared-movement-modifiers:))
    (global-actions-map (map action-blocks #:key key))
    ))
+
+(define defined-thing *def-with-a-newline*)

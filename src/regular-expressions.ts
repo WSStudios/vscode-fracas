@@ -78,10 +78,14 @@ export function escapeForRegEx(s: string): string {
         groupOffset += match[i].length;
     }
 
+    let newlinePadding = 0;
+    if (document.eol == vscode.EndOfLine.CRLF) {
+        newlinePadding = match.input.match(/\n/g)?.length ?? 0
+    }
     // convert the match offsets to a document range
     const groupRange = new vscode.Range(
         document.positionAt(groupOffset),
-        document.positionAt(groupOffset + match[group].length));
+        document.positionAt(groupOffset + match[group].length + newlinePadding));
     return new vscode.Location(document.uri, groupRange);
 }
 

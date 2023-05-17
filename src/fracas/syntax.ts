@@ -799,6 +799,15 @@ function _isCommentedOut(document: vscode.TextDocument, position: vscode.Positio
     return prefix.includes(";");
 }
 
+/**
+ * Search for where a fracas keyword is defined. A keyword is anything starting with "#:", 
+ * like method parameters or struct fields.
+ * @param referencingDocument The document containing the text to match against keyword definitions
+ * @param documentSelection The range within the document containing the text for which to search
+ * @param token used to cancel the search if the async task is cancelled
+ * @param searchKind whether to match keyword substrings, or only the entire keyword
+ * @returns information about matching values
+ */
 export async function findKeywordDefinition(
     referencingDocument?: vscode.TextDocument,
     documentSelection?: vscode.Range,
@@ -888,13 +897,14 @@ export async function findDefinition(
     token?: vscode.CancellationToken,
     searchKind: SearchKind = SearchKind.wholeMatch
 ): Promise<FracasDefinition[]> {
+    // look for struct fields or function parameters like "#:ability-name" matching the text
     const keywords: FracasDefinition[] = await findKeywordDefinition(
         document, new vscode.Range(position, position), token, searchKind);
     if (keywords.length > 0) {
         return keywords;
     }
 
-    // git the symbol at the cursor
+    // get the symbol at the cursor
     const symbol = getSelectedSymbol(document, position, true);
 
     // if the cursor is within an (import ... ) statement, find the source document

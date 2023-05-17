@@ -114,3 +114,11 @@
   (damage
    ((data damage-data)))
 )
+
+(define-game-data
+ *def-with-a-newline*
+  (action-block-targeted:
+   #:targeting *targeting-self*
+   #:found-actions (list (action-lerp: #:data *lerp-data-edge-recovery*))
+   )
+  )

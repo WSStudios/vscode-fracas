@@ -39,17 +39,17 @@ export function anySymbolRx(symbol: string): string {
 }
 
 export function anyDefineRx(): string {
-    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${RX_CHAR_IDENTIFIER}+)(?!${RX_CHARS_CLOSE_PAREN})`;
+    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})[\\s\\n]*[${RX_CHARS_OPEN_PAREN}]?\\s*(${RX_CHAR_IDENTIFIER}+)(?!${RX_CHARS_CLOSE_PAREN})`;
 }
 
 export function anyDefineSymbolRx(symbol: string, searchKind = SearchKind.wholeMatch): string {
     return searchKind === SearchKind.wholeMatch ?
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${escapeForRegEx(symbol)})(?!${RX_CHAR_IDENTIFIER})` :
-        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)`;
+        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})[\\s\\n]*[${RX_CHARS_OPEN_PAREN}]?\\s*(${escapeForRegEx(symbol)})(?!${RX_CHAR_IDENTIFIER})` :
+        `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})[\\s\\n]*[${RX_CHARS_OPEN_PAREN}]?\\s*(${escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)`;
 }
 
 export function definePartialSymbolRx(symbol: string): string {
-    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})\\s*[${RX_CHARS_OPEN_PAREN}]?\\s*(${RX_CHAR_IDENTIFIER}*${escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)(?!${RX_CHARS_CLOSE_PAREN})`;
+    return `(?<=[${RX_CHARS_OPEN_PAREN}])\\s*(${RX_SYMBOLS_DEFINE})[\\s\\n]*[${RX_CHARS_OPEN_PAREN}]?\\s*(${RX_CHAR_IDENTIFIER}*${escapeForRegEx(symbol)}${RX_CHAR_IDENTIFIER}*)(?!${RX_CHARS_CLOSE_PAREN})`;
 }
 
 export function anyEnumSymbolRx(symbol: string, searchKind = SearchKind.wholeMatch): string {

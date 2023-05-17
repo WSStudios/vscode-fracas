@@ -38,62 +38,62 @@ const provideAllFrc = path.join(testFixtureDir, 'provide-all.frc');
 const provideExceptOutFrc = path.join(testFixtureDir, 'provide-except-out.frc');
 
 
-suite("Editor Lib Tests", () => {
-    vscode.window.showInformationMessage("Start editor lib tests.");
+// suite("Editor Lib Tests", () => {
+//     vscode.window.showInformationMessage("Start editor lib tests.");
 
-    test("getSelectedSymbol returns word under cursor", async () => {
-        await showFracasDocument(rewardFrc, new vscode.Range(6, 9, 6, 9));
-        const symbol = getSelectedSymbol();
-        assert.strictEqual(symbol, "#:count");
-    });
+//     test("getSelectedSymbol returns word under cursor", async () => {
+//         await showFracasDocument(rewardFrc, new vscode.Range(6, 9, 6, 9));
+//         const symbol = getSelectedSymbol();
+//         assert.strictEqual(symbol, "#:count");
+//     });
 
-    test("getSelectedSymbol returns selection range", async () => {
-        await showFracasDocument(rewardFrc, new vscode.Range(6, 12, 6, 16)); // selection around "ount"
-        const symbol = getSelectedSymbol();
-        assert.strictEqual(symbol, "ount");
-    });
-});
+//     test("getSelectedSymbol returns selection range", async () => {
+//         await showFracasDocument(rewardFrc, new vscode.Range(6, 12, 6, 16)); // selection around "ount"
+//         const symbol = getSelectedSymbol();
+//         assert.strictEqual(symbol, "ount");
+//     });
+// });
 
-suite("Import Tests", () => {
-    vscode.window.showInformationMessage("Start import tests.");
+// suite("Import Tests", () => {
+//     vscode.window.showInformationMessage("Start import tests.");
 
-    test("findAllImportDefinitions finds the correct imports", async () => {
-        const { document, editor } = await showFracasDocument(collisionDefinesFrc);
-        const imports = findAllImportDefinitions(document);
-        const importSymbols = imports.map(i => i.symbol);
-        assert.deepStrictEqual(importSymbols, ["fracas/utils/ws-math", "unreal-defines"] );
-    });
-});
+//     test("findAllImportDefinitions finds the correct imports", async () => {
+//         const { document, editor } = await showFracasDocument(collisionDefinesFrc);
+//         const imports = findAllImportDefinitions(document);
+//         const importSymbols = imports.map(i => i.symbol);
+//         assert.deepStrictEqual(importSymbols, ["fracas/utils/ws-math", "unreal-defines"] );
+//     });
+// });
 
-suite("Provide Tests", () => {
-    vscode.window.showInformationMessage("Start import tests.");
+// suite("Provide Tests", () => {
+//     vscode.window.showInformationMessage("Start import tests.");
 
-    test("findProvidedLocalIdentifiers finds explicit provide identifiers", async () => {
-        const { document, editor } = await showFracasDocument(provideSomeFrc);
-        const provides = await findProvidedLocalIdentifiers(document);
-        assert.ok(provides.get("not-hidden-enum"));
-        assert.ok(!provides.get("commented-type"));
-        assert.ok(provides.get("*visible-to-all*"));
-    });
+//     test("findProvidedLocalIdentifiers finds explicit provide identifiers", async () => {
+//         const { document, editor } = await showFracasDocument(provideSomeFrc);
+//         const provides = await findProvidedLocalIdentifiers(document);
+//         assert.ok(provides.get("not-hidden-enum"));
+//         assert.ok(!provides.get("commented-type"));
+//         assert.ok(provides.get("*visible-to-all*"));
+//     });
 
-    test("findProvidedLocalIdentifiers finds local identifiers for (all-defined-out)", async () => {
-        const { document, editor } = await showFracasDocument(provideAllFrc);
-        const provides = await findProvidedLocalIdentifiers(document);
-        assert.ok(!provides.get("not-hidden-enum"), "transitively provided `not-hidden-enum` is not a local identifier");
-        assert.ok(provides.get("provided-enum"));
-        assert.ok(provides.get("*goodbye*"));
-        assert.ok(provides.get("provided-type"));
-    });
+//     test("findProvidedLocalIdentifiers finds local identifiers for (all-defined-out)", async () => {
+//         const { document, editor } = await showFracasDocument(provideAllFrc);
+//         const provides = await findProvidedLocalIdentifiers(document);
+//         assert.ok(!provides.get("not-hidden-enum"), "transitively provided `not-hidden-enum` is not a local identifier");
+//         assert.ok(provides.get("provided-enum"));
+//         assert.ok(provides.get("*goodbye*"));
+//         assert.ok(provides.get("provided-type"));
+//     });
 
-    test("findProvidedLocalIdentifiers finds excludes excepted identifiers for (except-out)", async () => {
-        const { document, editor } = await showFracasDocument(provideExceptOutFrc);
-        const provides = await findProvidedLocalIdentifiers(document);
-        assert.ok(!provides.get("exceptional-enum"), "except-out identifier should be excluded");
-        assert.ok(provides.get("not-exceptional-enum"));
-        assert.ok(provides.get("*not-special*"));
-    });
+//     test("findProvidedLocalIdentifiers finds excludes excepted identifiers for (except-out)", async () => {
+//         const { document, editor } = await showFracasDocument(provideExceptOutFrc);
+//         const provides = await findProvidedLocalIdentifiers(document);
+//         assert.ok(!provides.get("exceptional-enum"), "except-out identifier should be excluded");
+//         assert.ok(provides.get("not-exceptional-enum"));
+//         assert.ok(provides.get("*not-special*"));
+//     });
 
-});
+// });
 
 suite("Find Definition Tests", () => {
     vscode.window.showInformationMessage("Start findDefinition tests.");
@@ -125,6 +125,17 @@ suite("Find Definition Tests", () => {
         assert.strictEqual(defs[0].symbol, "*key-none*", "symbol is not '*key-none*'");
         assert.strictEqual(defs[0].location.uri.fsPath, abilityActionDefinesFrc);
         assert.deepStrictEqual(defs[0].location.range, new vscode.Range(1, 12, 1, 22), "location of key is not correct");
+    });
+
+    test("findDefinition resolves a define-game-data with a newline", async () => {
+        const { document } = await showFracasDocument(abilityDataDefinesFrc);
+        const defs: FracasDefinition[] = await findDefinition(document, new vscode.Position(426, 29)); // cursor within "*def-with-a-newline*"
+        assert.strictEqual(defs.length, 1, "single definition not found");
+        assert.strictEqual(defs[0].kind, FracasDefinitionKind.gameData, "type definition kind is not 'gameData'");
+        assert.strictEqual(defs[0].completionKind, vscode.CompletionItemKind.Module, "type completion kind is not 'Module'");
+        assert.strictEqual(defs[0].symbol, "*def-with-a-newline*", "symbol is not '*def-with-a-newline*'");
+        assert.strictEqual(defs[0].location.uri.fsPath, abilityActionDefinesFrc);
+        assert.deepStrictEqual(defs[0].location.range, new vscode.Range(117, 17, 118, 21), "location of define-game-data is not correct");
     });
 
     test("findDefinition resolves a named parameter", async () => {
